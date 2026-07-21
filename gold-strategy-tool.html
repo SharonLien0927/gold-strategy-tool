@@ -383,19 +383,23 @@ async function syncFromCloud(){
   refreshDateUI();
 }
 
-async function persistAll(){
-  const payload = {entries, reportHistory};
-  try{ localStorage.setItem(LOCAL_KEY, JSON.stringify(payload)); }
-  catch(e){ console.error(e); }
+async function persistCloud(payload){
   try{
     await withTimeout(setDoc(sharedDocRef, payload), 8000);
     cloudOk = true;
   }catch(e){
     console.error(e);
     cloudOk = false;
-    showToast('雲端同步失敗，已暫存本機', true);
+    showToast('雲端同步失敗，已暫存本機，稍後會自動再試', true);
   }
   updateStorageStatus();
+}
+
+async function persistAll(){
+  const payload = {entries, reportHistory};
+  try{ localStorage.setItem(LOCAL_KEY, JSON.stringify(payload)); }
+  catch(e){ console.error(e); }
+  persistCloud(payload); // 背景同步，不卡住畫面回饋
 }
 
 function downloadReportHistory(){
