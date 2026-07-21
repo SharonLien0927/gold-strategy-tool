@@ -1,0 +1,703 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>每日策略</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500;600;700&display=swap');
+
+  :root{
+    --bg:#0F1218; --surface:#181C24; --surface-2:#20252F; --border:#2A3040;
+    --text:#ECE8DE; --text-dim:#8B93A5;
+    --gold:#C9A24B; --gold-bright:#E4C36B;
+    --green:#5FAE82; --red:#D9614F; --amber:#E0A83E;
+  }
+  *{box-sizing:border-box; -webkit-tap-highlight-color:transparent;}
+  body{margin:0; background:var(--bg); color:var(--text); font-family:'Inter',sans-serif; padding:20px 14px 60px; min-height:100vh;}
+  .wrap{max-width:520px; margin:0 auto;}
+  header{margin-bottom:22px;}
+  .eyebrow{font-family:'JetBrains Mono',monospace; font-size:11px; letter-spacing:2px; color:var(--gold); text-transform:uppercase; margin-bottom:6px;}
+  h1{font-family:'Space Grotesk',sans-serif; font-size:26px; font-weight:700; margin:0 0 4px;}
+  .subtitle{color:var(--text-dim); font-size:13px;}
+
+  .card{background:var(--surface); border:1px solid var(--border); border-radius:14px; padding:18px; margin-bottom:14px;}
+  .card-accent{border-left:3px solid var(--gold);}
+  .section-title{font-family:'Space Grotesk',sans-serif; font-size:14px; font-weight:600; color:var(--gold-bright); margin:0 0 14px; display:flex; align-items:center; gap:8px; justify-content:space-between;}
+  .section-title .hint{font-size:11px; color:var(--text-dim); font-weight:400;}
+
+  .field-row{display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-bottom:10px;}
+  .field{display:flex; flex-direction:column; gap:6px;}
+  .field.full{grid-column:1/-1;}
+  label{font-size:12px; color:var(--text-dim);}
+  input[type=number], input[type=date]{
+    background:var(--surface-2); border:1px solid var(--border); border-radius:8px;
+    padding:11px 10px; color:var(--text); font-family:'JetBrains Mono',monospace; font-size:15px; width:100%;
+  }
+  input:focus{outline:none; border-color:var(--gold);}
+  input:read-only{opacity:0.65;}
+  input::-webkit-outer-spin-button, input::-webkit-inner-spin-button{opacity:0.4;}
+  textarea{
+    background:var(--surface-2); border:1px solid var(--border); border-radius:8px;
+    padding:11px 10px; color:var(--text); font-family:'Inter',sans-serif;
+    font-size:13.5px; width:100%; resize:vertical; line-height:1.5;
+  }
+  textarea:focus{outline:none; border-color:var(--gold);}
+
+  .btn{width:100%; padding:14px; border-radius:10px; border:none; font-family:'Space Grotesk',sans-serif; font-weight:600; font-size:15px; cursor:pointer; transition:opacity .15s;}
+  .btn:active{opacity:0.7;}
+  .btn-primary{background:var(--gold); color:#191204;}
+  .btn-secondary{background:var(--surface-2); color:var(--gold-bright); border:1px solid var(--gold); margin-bottom:0;}
+  .btn-ghost{background:transparent; border:1px solid var(--border); color:var(--text-dim); margin-top:8px;}
+
+  .fiveday-row{display:grid; grid-template-columns:28px 1fr 1fr 1fr; gap:8px; align-items:center; padding:8px 0; border-bottom:1px solid var(--border);}
+  .fiveday-row:last-child{border-bottom:none;}
+  .fiveday-head{font-size:10px; color:var(--text-dim); text-transform:uppercase; letter-spacing:.5px;}
+  .fiveday-row.error input{border-color:var(--red);}
+  .chk{width:22px; height:22px; border-radius:6px; border:1.5px solid var(--border); background:var(--surface-2); cursor:pointer; position:relative; flex-shrink:0;}
+  .chk.checked{background:var(--gold); border-color:var(--gold);}
+  .chk.checked::after{content:'✓'; position:absolute; inset:0; display:flex; align-items:center; justify-content:center; color:#191204; font-size:14px; font-weight:700;}
+  .fiveday-row input{padding:8px 6px; font-size:13px;}
+  .avg-readout{margin-top:12px; padding:12px 14px; background:var(--surface-2); border-radius:10px; display:flex; justify-content:space-between; align-items:center;}
+  .avg-readout .k{font-size:12px; color:var(--text-dim);}
+  .avg-readout .v{font-family:'JetBrains Mono',monospace; font-size:18px; font-weight:700; color:var(--gold-bright);}
+
+  .ladder-wrap{margin:6px 0 4px;}
+  svg{display:block; width:100%; height:auto;}
+
+  .stat-grid{display:grid; grid-template-columns:1fr 1fr; gap:10px;}
+  .stat{background:var(--surface-2); border-radius:10px; padding:10px 12px;}
+  .stat .k{font-size:11px; color:var(--text-dim); margin-bottom:4px;}
+  .stat .v{font-family:'JetBrains Mono',monospace; font-size:16px; font-weight:600;}
+  .stat .v.gold{color:var(--gold-bright);} .stat .v.green{color:var(--green);} .stat .v.red{color:var(--red);}
+
+  .pill-row{display:flex; gap:8px; margin-bottom:14px;}
+  .pill{flex:1; text-align:center; padding:9px; border-radius:8px; font-size:13px; font-weight:600; border:1px solid var(--border); color:var(--text-dim); cursor:pointer; font-family:'Space Grotesk',sans-serif;}
+  .pill.active{background:var(--gold); color:#191204; border-color:var(--gold);}
+
+  .notice{display:flex; gap:8px; align-items:flex-start; padding:11px 13px; border-radius:10px; background:rgba(224,168,62,0.1); border:1px solid rgba(224,168,62,0.35); font-size:12.5px; color:var(--amber); margin-bottom:12px; line-height:1.5;}
+  .error-notice{background:rgba(217,97,79,0.12); border:1px solid rgba(217,97,79,0.4); color:var(--red); padding:11px 13px; border-radius:10px; font-size:13px; margin-top:10px;}
+
+  .judge{display:flex; align-items:center; justify-content:space-between; padding:12px 14px; border-radius:10px; margin-top:8px;}
+  .judge.ok{background:rgba(95,174,130,0.12); border:1px solid rgba(95,174,130,0.4);}
+  .judge.warn{background:rgba(224,168,62,0.12); border:1px solid rgba(224,168,62,0.4);}
+  .judge.bad{background:rgba(217,97,79,0.12); border:1px solid rgba(217,97,79,0.4);}
+  .judge .label{font-size:13px; color:var(--text-dim);}
+  .judge .r-value{font-family:'JetBrains Mono',monospace; font-size:20px; font-weight:700;}
+
+  .threshold-row{display:flex; align-items:center; gap:8px; font-size:12px; color:var(--text-dim); margin-top:10px;}
+  .threshold-row input{width:60px; padding:6px 8px; font-size:13px;}
+
+  #report{font-family:'JetBrains Mono',monospace; font-size:12.5px; line-height:1.7; white-space:pre-wrap; background:var(--surface-2); border-radius:10px; padding:14px; border:1px solid var(--border); max-height:400px; overflow-y:auto;}
+
+  details{border:1px solid var(--border); border-radius:10px; padding:0; background:var(--surface-2);}
+  details summary{padding:12px 14px; cursor:pointer; font-family:'Space Grotesk',sans-serif; font-weight:600; font-size:13px; color:var(--gold-bright); list-style:none;}
+  details summary::-webkit-details-marker{display:none;}
+  details[open] summary{border-bottom:1px solid var(--border);}
+  .glossary-table{padding:6px 14px 14px;}
+  .glossary-row{display:grid; grid-template-columns:70px 1fr; gap:10px; padding:8px 0; border-bottom:1px solid var(--border); font-size:12.5px;}
+  .glossary-row:last-child{border-bottom:none;}
+  .glossary-row .term{font-family:'JetBrains Mono',monospace; color:var(--gold-bright); font-weight:700;}
+  .glossary-row .def{color:var(--text-dim); line-height:1.5;}
+
+  .toast{position:fixed; bottom:24px; left:50%; transform:translateX(-50%) translateY(20px); background:var(--gold); color:#191204; padding:10px 20px; border-radius:20px; font-family:'Space Grotesk',sans-serif; font-weight:600; font-size:13px; opacity:0; transition:all .25s; pointer-events:none; z-index:99;}
+  .toast.show{opacity:1; transform:translateX(-50%) translateY(0);}
+  .toast.err{background:var(--red); color:#fff;}
+  .empty-hint{color:var(--text-dim); font-size:13px; text-align:center; padding:20px 0;}
+  .active-date-badge{font-family:'JetBrains Mono',monospace; font-size:12px; background:var(--surface-2); color:var(--gold-bright); padding:5px 10px; border-radius:6px; display:inline-block; margin-bottom:12px;}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header>
+    <div class="eyebrow">GOLD · DAILY STRATEGY ENGINE</div>
+    <h1>每日策略</h1>
+    <div class="subtitle">先填五日高低點，再輸入當日關鍵價位</div>
+  </header>
+
+  <details style="margin-bottom:14px;">
+    <summary>📖 縮寫名詞解釋（點擊展開）</summary>
+    <div class="glossary-table">
+      <div class="glossary-row"><div class="term">H</div><div class="def">突破口高點，等於當日最高點</div></div>
+      <div class="glossary-row"><div class="term">L</div><div class="def">突破口低點，等於當日最低點</div></div>
+      <div class="glossary-row"><div class="term">UL</div><div class="def">美盤回調低點，主觀判斷是否存在，搭配突破口高點 H 計算</div></div>
+      <div class="glossary-row"><div class="term">UH</div><div class="def">美盤回調高點，主觀判斷是否存在，搭配突破口低點 L 計算（與UL鏡像對稱）</div></div>
+      <div class="glossary-row"><div class="term">PC</div><div class="def">關盤價</div></div>
+      <div class="glossary-row"><div class="term">CR</div><div class="def">收盤位置比例：(PC−L)÷(H−L)，越接近1代表收盤偏向高點</div></div>
+      <div class="glossary-row"><div class="term">5Avg</div><div class="def">5日平均波幅，近5個交易日（最高−最低）的平均值</div></div>
+      <div class="glossary-row"><div class="term">R</div><div class="def">損益比：(多空區間距離−雙成本領域)÷成本領域，數值越大代表利潤空間越充足</div></div>
+    </div>
+  </details>
+  <div style="height:14px;"></div>
+
+  <div class="card card-accent">
+    <div class="section-title">📋 五日高低點紀錄 <span class="hint">點方框＝設為今日</span></div>
+    <div class="fiveday-row fiveday-head"><div></div><div>日期</div><div>最高點</div><div>最低點</div></div>
+    <div id="fiveday-body"></div>
+    <div id="fiveday-error" class="error-notice" style="display:none;"></div>
+    <button class="btn btn-secondary" id="btn-save5" style="margin-top:12px;">更新五日紀錄</button>
+    <div class="avg-readout"><div class="k">5日平均波幅</div><div class="v" id="avg5-readout">—</div></div>
+  </div>
+
+  <div class="card card-accent">
+    <div class="section-title">🔑 當日關鍵價位輸入</div>
+    <div class="active-date-badge" id="active-date-badge">尚未選擇日期</div>
+    <div class="field-row">
+      <div class="field"><label>突破口高點 H（唯讀）</label><input type="number" id="in-H" readonly></div>
+      <div class="field"><label>突破口低點 L（唯讀）</label><input type="number" id="in-L" readonly></div>
+    </div>
+
+    <label style="display:block; margin:4px 0 8px;">今日回調點型態</label>
+    <div class="pill-row" id="pullback-type">
+      <div class="pill active" data-type="none">無</div>
+      <div class="pill" data-type="UL">回調低點 UL</div>
+      <div class="pill" data-type="UH">回調高點 UH</div>
+    </div>
+
+    <div class="field-row" id="pullback-value-row" style="display:none;">
+      <div class="field full"><label id="pullback-value-label">回調點數值</label><input type="number" step="0.01" id="in-pullback"></div>
+    </div>
+
+    <div class="field-row">
+      <div class="field full"><label>關盤價 PC</label><input type="number" step="0.01" id="in-PC" placeholder="4052.60"></div>
+    </div>
+    <div class="threshold-row">
+      <span>利潤空間 R 門檻</span>
+      <input type="number" step="0.1" id="in-threshold" value="3.0">
+      <span>（可自行校正）</span>
+    </div>
+    <button class="btn btn-primary" style="margin-top:14px;" id="btn-calc">計算報表</button>
+  </div>
+
+  <div id="results" style="display:none;">
+
+    <div class="card">
+      <div class="section-title">📏 區間量尺</div>
+      <div class="ladder-wrap" id="ladder"></div>
+    </div>
+
+    <div class="card">
+      <div class="section-title">🌊 波幅數據</div>
+      <div class="stat-grid">
+        <div class="stat"><div class="k">單日波幅</div><div class="v" id="s-dailyvol">—</div></div>
+        <div class="stat"><div class="k">5日平均波幅</div><div class="v" id="s-avg5">—</div></div>
+        <div class="stat"><div class="k">成本&領域範圍</div><div class="v gold" id="s-cost">—</div></div>
+        <div class="stat"><div class="k">反轉引線門檻</div><div class="v gold" id="s-wick">—</div></div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="section-title">🔑 關盤價技術指標</div>
+      <div class="stat-grid">
+        <div class="stat"><div class="k">CR 收盤位置比</div><div class="v" id="s-cr">—</div></div>
+        <div class="stat"><div class="k" id="lbl-hpc">H − PC</div><div class="v" id="s-hpc">—</div></div>
+      </div>
+      <div class="stat-grid" id="pullback-stats" style="margin-top:10px; display:none;">
+        <div class="stat"><div class="k" id="lbl-stat1">H − UL</div><div class="v" id="s-stat1">—</div></div>
+        <div class="stat"><div class="k" id="lbl-stat2">PC − UL</div><div class="v" id="s-stat2">—</div></div>
+      </div>
+    </div>
+
+    <div class="card" id="card-distance" style="display:none;">
+      <div class="section-title">📊 距離判斷</div>
+      <div class="stat-grid">
+        <div class="stat"><div class="k" id="lbl-pct1">距離 ÷ 單日波幅</div><div class="v" id="s-pct1">—</div></div>
+        <div class="stat"><div class="k" id="lbl-pct2">距離 ÷ 5日均幅</div><div class="v" id="s-pct2">—</div></div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="section-title">🎯 區間損益比</div>
+      <div class="stat-grid">
+        <div class="stat"><div class="k" id="range-label">多空區間距離</div><div class="v" id="s-range">—</div></div>
+        <div class="stat"><div class="k">雙成本領域</div><div class="v" id="s-doublecost">—</div></div>
+      </div>
+      <div class="judge" id="judge-box">
+        <div class="label">利潤空間可否</div>
+        <div class="r-value" id="s-rvalue">—</div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="section-title">🧭 策略解析（主觀判斷填寫）</div>
+
+      <label style="display:block; margin-bottom:8px;">趨勢 D1</label>
+      <div class="pill-row" data-strat="d1">
+        <div class="pill" data-v="上漲">上漲</div><div class="pill active" data-v="震盪">震盪</div><div class="pill" data-v="下跌">下跌</div>
+      </div>
+      <label style="display:block; margin-bottom:8px;">趨勢 H4</label>
+      <div class="pill-row" data-strat="h4">
+        <div class="pill" data-v="上漲">上漲</div><div class="pill active" data-v="震盪">震盪</div><div class="pill" data-v="下跌">下跌</div>
+      </div>
+      <label style="display:block; margin-bottom:8px;">趨勢 H1</label>
+      <div class="pill-row" data-strat="h1">
+        <div class="pill" data-v="上漲">上漲</div><div class="pill active" data-v="震盪">震盪</div><div class="pill" data-v="下跌">下跌</div>
+      </div>
+
+      <label style="display:block; margin-bottom:8px;">關盤價是否接近突破口</label>
+      <div class="pill-row" data-strat="nearBreak">
+        <div class="pill active" data-v="無">無</div><div class="pill" data-v="有">有</div>
+      </div>
+
+      <label style="display:block; margin-bottom:8px;">是否有特殊盤型</label>
+      <div class="pill-row" data-strat="specialType">
+        <div class="pill active" data-v="無">無</div><div class="pill" data-v="有">有</div>
+      </div>
+      <div class="field full" id="special-note-row" style="display:none; margin-bottom:10px;">
+        <input type="text" id="strat-specialNote" placeholder="特殊盤型說明">
+      </div>
+
+      <div class="field full" style="margin-bottom:10px;">
+        <label>今日策略模組</label>
+        <input type="text" id="strat-module" placeholder="例：套用上漲 B2 模組">
+      </div>
+      <div class="field full" style="margin-bottom:10px;">
+        <label>策略語句</label>
+        <input type="text" id="strat-phrase" placeholder="例：破突破口高點或美盤回調低點，才可參考反轉訊號提醒">
+      </div>
+      <div class="field full" style="margin-bottom:10px;">
+        <label>突破口高點分析</label>
+        <textarea id="strat-highAnalysis" rows="2" placeholder="下方領域內是否有適合損益比分析線可參考…"></textarea>
+      </div>
+      <div class="field full" style="margin-bottom:10px;">
+        <label>突破口低點分析</label>
+        <textarea id="strat-lowAnalysis" rows="2" placeholder="上方領域內是否有適合損益比分析線可參考…"></textarea>
+      </div>
+      <div class="field full" style="margin-bottom:10px;">
+        <label>起漲點分析</label>
+        <textarea id="strat-riseAnalysis" rows="2" placeholder="若亞盤上漲破突破口高點，標注日內低點為起漲點…"></textarea>
+      </div>
+      <div class="field full" style="margin-bottom:10px;">
+        <label>小起跌點分析</label>
+        <textarea id="strat-fallAnalysis" rows="2" placeholder="若亞盤下跌破美盤回調低點，標注日內高點為小起跌點…"></textarea>
+      </div>
+      <div class="field full" style="margin-bottom:10px;">
+        <label>萬能策略：上漲行情反轉</label>
+        <textarea id="strat-upReversal" rows="2" placeholder="需破突破口高點，待日內最高點出轉空訊號，收下關鍵分析線…"></textarea>
+      </div>
+      <div class="field full" style="margin-bottom:0;">
+        <label>萬能策略：下跌行情反轉</label>
+        <textarea id="strat-downReversal" rows="2" placeholder="需破美盤回調低點，待日內最低點出轉多訊號，收上關鍵分析線…"></textarea>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="pill-row">
+        <div class="pill active" data-mode="full">完整報表</div>
+        <div class="pill" data-mode="compact">精簡模式</div>
+      </div>
+      <div id="report"></div>
+      <button class="btn btn-ghost" id="btn-copy">📋 複製文字</button>
+    </div>
+  </div>
+
+  <div class="empty-hint" id="empty-hint">請先更新五日紀錄，並點選今日日期，再計算報表</div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+const $ = id => document.getElementById(id);
+const fmt = (n,d=2) => isFinite(n) ? n.toFixed(d) : '—';
+const fmtPct = n => isFinite(n) ? n.toFixed(1)+'%' : '—';
+
+let entries = [];
+let selectedDate = null;
+let reportMode = 'full';
+let pullbackType = 'none'; // none | UL | UH
+let lastCalc = null;
+
+function isoDate(d){ return d.toISOString().slice(0,10); }
+
+async function loadEntries(){
+  try{ const res = await window.storage.get('gold-entries', false); if(res && res.value) return JSON.parse(res.value); }
+  catch(e){}
+  return [];
+}
+async function persistEntries(){
+  try{ await window.storage.set('gold-entries', JSON.stringify(entries), false); }
+  catch(e){ console.error(e); }
+}
+
+function showToast(msg, isErr){
+  const t = $('toast'); t.textContent = msg;
+  t.className = 'toast show' + (isErr ? ' err' : '');
+  setTimeout(()=>t.classList.remove('show'), 2200);
+}
+
+function last5Dates(){
+  const arr = []; const today = new Date();
+  for(let i=4;i>=0;i--){ const d = new Date(today); d.setDate(d.getDate()-i); arr.push(isoDate(d)); }
+  return arr;
+}
+
+function buildFiveDayRows(){
+  const sorted = [...entries].sort((a,b)=>a.date.localeCompare(b.date));
+  let rows = sorted.slice(-5);
+  const dates = last5Dates();
+  while(rows.length < 5){
+    const missing = dates.filter(d=>!rows.find(r=>r.date===d));
+    rows.push({date: missing[0] || dates[rows.length], high:'', low:''});
+    rows.sort((a,b)=>a.date.localeCompare(b.date));
+  }
+  return rows.slice(-5);
+}
+
+function renderFiveDayTable(){
+  const rows = buildFiveDayRows();
+  const body = $('fiveday-body');
+  body.innerHTML = '';
+  rows.forEach((r, idx)=>{
+    const row = document.createElement('div');
+    row.className = 'fiveday-row';
+    const isSelected = r.date === selectedDate;
+    row.innerHTML = `
+      <div class="chk ${isSelected?'checked':''}" data-date="${r.date}"></div>
+      <div><input type="date" value="${r.date}" data-field="date" data-idx="${idx}"></div>
+      <div><input type="number" step="0.01" value="${r.high}" placeholder="高點" data-field="high" data-idx="${idx}"></div>
+      <div><input type="number" step="0.01" value="${r.low}" placeholder="低點" data-field="low" data-idx="${idx}"></div>
+    `;
+    body.appendChild(row);
+  });
+  body.querySelectorAll('.chk').forEach(chk=>{
+    chk.addEventListener('click', ()=>{
+      const date = chk.dataset.date;
+      selectedDate = date;
+      const rowInputs = chk.parentElement.querySelectorAll('input');
+      const high = parseFloat(rowInputs[1].value);
+      const low = parseFloat(rowInputs[2].value);
+      $('in-H').value = isFinite(high) ? high : '';
+      $('in-L').value = isFinite(low) ? low : '';
+      $('active-date-badge').textContent = '目前分析日期：' + date;
+      renderFiveDayTable();
+    });
+  });
+}
+
+async function saveFiveDay(){
+  const body = $('fiveday-body');
+  const dateInputs = body.querySelectorAll('input[data-field=date]');
+  const rowsData = [];
+  const badRows = [];
+
+  dateInputs.forEach((dIn, idx)=>{
+    const highInput = body.querySelector(`input[data-field=high][data-idx="${idx}"]`);
+    const lowInput = body.querySelector(`input[data-field=low][data-idx="${idx}"]`);
+    const high = parseFloat(highInput.value);
+    const low = parseFloat(lowInput.value);
+    highInput.parentElement.classList.remove('error');
+    lowInput.parentElement.classList.remove('error');
+    if(dIn.value && highInput.value !== '' && lowInput.value !== ''){
+      if(low >= high){
+        badRows.push(dIn.value);
+        highInput.closest('.fiveday-row') || null;
+      } else {
+        rowsData.push({date: dIn.value, high, low});
+      }
+    }
+  });
+
+  if(badRows.length){
+    $('fiveday-error').style.display = 'block';
+    $('fiveday-error').textContent = `⚠️ 以下日期低點大於或等於高點，請修正：${badRows.join('、')}`;
+    showToast('資料有誤，未儲存', true);
+    return;
+  }
+  $('fiveday-error').style.display = 'none';
+
+  rowsData.forEach(r=>{ entries = entries.filter(e=>e.date !== r.date); entries.push(r); });
+  entries.sort((a,b)=>a.date.localeCompare(b.date));
+  if(entries.length>30) entries = entries.slice(-30);
+  await persistEntries();
+
+  const avg5 = get5Avg();
+  $('avg5-readout').textContent = fmt(avg5);
+  renderFiveDayTable();
+  showToast('五日紀錄已更新 ✓');
+}
+
+function get5Avg(){
+  const last5 = entries.slice(-5);
+  if(!last5.length) return NaN;
+  return last5.reduce((s,e)=>s+(e.high-e.low),0)/last5.length;
+}
+
+function drawLadder(L, pullbackVal, PC, H, type){
+  const pts = [{v:L,label:'L',color:'var(--red)'},{v:PC,label:'PC',color:'var(--gold-bright)'},{v:H,label:'H',color:'var(--green)'}];
+  if(type !== 'none') pts.push({v:pullbackVal, label:type, color:'var(--amber)'});
+  pts.sort((a,b)=>a.v-b.v);
+  const min = Math.min(...pts.map(p=>p.v)), max = Math.max(...pts.map(p=>p.v));
+  const range = (max-min)||1;
+  const pad=30, W=480, Hh=70;
+  const x = v => pad + ((v-min)/range)*(W-pad*2);
+  let svg = `<svg viewBox="0 0 ${W} ${Hh}" xmlns="http://www.w3.org/2000/svg">`;
+  svg += `<line x1="${pad}" y1="40" x2="${W-pad}" y2="40" stroke="var(--border)" stroke-width="2"/>`;
+  pts.forEach(p=>{
+    const px = x(p.v);
+    svg += `<circle cx="${px}" cy="40" r="6" fill="${p.color}" stroke="var(--bg)" stroke-width="2"/>`;
+    svg += `<text x="${px}" y="24" font-family="JetBrains Mono, monospace" font-size="11" fill="${p.color}" text-anchor="middle" font-weight="700">${p.label}</text>`;
+    svg += `<text x="${px}" y="60" font-family="JetBrains Mono, monospace" font-size="10" fill="var(--text-dim)" text-anchor="middle">${fmt(p.v)}</text>`;
+  });
+  svg += `</svg>`;
+  $('ladder').innerHTML = svg;
+}
+
+function renderJudge(R, threshold){
+  const box = $('judge-box'); box.className = 'judge';
+  let label, cls;
+  if(R >= threshold){ label='✅ 可行'; cls='ok'; }
+  else if(R >= threshold-1){ label='⚠️ 勉強可行'; cls='warn'; }
+  else { label='❌ 不可行'; cls='bad'; }
+  box.classList.add(cls);
+  $('s-rvalue').textContent = fmt(R,2)+'R';
+  $('s-rvalue').style.color = cls==='ok' ? 'var(--green)' : cls==='warn' ? 'var(--amber)' : 'var(--red)';
+  return label;
+}
+
+function buildReport(mode, d){
+  if(mode === 'compact'){
+    let midLine = `H ${fmt(d.H)}  L ${fmt(d.L)}`;
+    if(d.type!=='none') midLine += `  ${d.type} ${fmt(d.pullbackVal)}`;
+    midLine += `  PC ${fmt(d.PC)}`;
+    let crLine = `CR ${fmt(d.CR,2)}`;
+    if(d.type!=='none') crLine += ` ／ ${d.stat1Label} ${fmt(d.stat1)} ／ ${d.stat2Label} ${fmt(d.stat2)}`;
+    else crLine += `（今日無回調點）`;
+    return [
+      `【${d.date}】每日策略速覽`,
+      `波幅 ${fmt(d.dailyVol)} ／ 5日均 ${fmt(d.avg5)} ／ 成本 ${fmt(d.cost)}`,
+      midLine, crLine,
+      `R值 ${fmt(d.R,2)} → ${d.judgeLabel}`,
+      ``,
+      buildStratSection('compact', getStratFields())
+    ].join('\n');
+  }
+  const lines = [
+    `每日策略  ${d.date}`, ``,
+    `▫ 單日波幅參考：【${fmt(d.dailyVol)}】美金`,
+    `▫ 5日平均波幅：【${fmt(d.avg5)}】美金`,
+    `▫ 成本&領域範圍（5Avg*10%）：【${fmt(d.cost)}】美金 ✅`,
+    `▫ 保本開啟（5Avg*10%）：＞【${fmt(d.cost)}】美金 ✅`,
+    `▫ 反轉訊號引線長度（5Avg*3%）：＞【${fmt(d.wick)}】小點 ✅`, ``,
+    `▫ 突破口高點【${fmt(d.H)}】／突破口低點【${fmt(d.L)}】`,
+  ];
+  if(d.type !== 'none'){
+    lines.push(`▫ ${d.type==='UL' ? '美盤回調低點' : '美盤回調高點'}【${fmt(d.pullbackVal)}】`);
+    lines.push(`▫ 關盤價【${fmt(d.PC)}】(CR=${fmt(d.CR,2)})(${d.stat1Label}=${fmt(d.stat1)}；H-PC=${fmt(d.H_PC)}；${d.stat2Label}=${fmt(d.stat2)})`);
+    lines.push(``);
+    lines.push(`▫ ${d.stat1Label}距離：${fmt(d.stat1)}美金；佔單日波幅 ${fmtPct(d.pctOfDaily)}${d.exceed30?'（超過30%）':''}；佔5日均幅 ${fmtPct(d.pctOfAvg5)}${d.exceed40?'（超過40%）':''}`);
+  } else {
+    lines.push(`▫ 關盤價【${fmt(d.PC)}】(CR=${fmt(d.CR,2)})(H-PC=${fmt(d.H_PC)})`);
+    lines.push(``);
+    lines.push(`▫ 今日無回調點，距離判斷不適用`);
+  }
+  lines.push(``);
+  lines.push(`▫ 多空區間距離：${fmt(d.range)}U${d.type==='none' ? '（無回調點，以 H-L 代替）':''} — 雙成本領域：${fmt(d.doubleCost)}U`);
+  lines.push(`▫ 損益比 R = ${fmt(d.R,2)}R → 利潤空間：${d.judgeLabel}（門檻 R≥${d.threshold}）`);
+  lines.push(``);
+  lines.push(buildStratSection('full', getStratFields()));
+  return lines.join('\n');
+}
+
+async function calculate(){
+  const date = selectedDate;
+  const H = parseFloat($('in-H').value);
+  const L = parseFloat($('in-L').value);
+  const PC = parseFloat($('in-PC').value);
+  const threshold = parseFloat($('in-threshold').value) || 3.0;
+  const pullbackVal = parseFloat($('in-pullback').value);
+
+  if(!date){ showToast('請先在五日紀錄點選今日日期', true); return; }
+  if([H,L,PC].some(v=>isNaN(v))){ showToast('請確認 H / L / PC 皆有值', true); return; }
+  if(pullbackType !== 'none' && isNaN(pullbackVal)){ showToast('請輸入回調點數值，或改選「無」', true); return; }
+
+  entries = entries.filter(e=>e.date !== date);
+  entries.push({date, high:H, low:L});
+  entries.sort((a,b)=>a.date.localeCompare(b.date));
+  if(entries.length>30) entries = entries.slice(-30);
+  await persistEntries();
+  renderFiveDayTable();
+
+  const avg5 = get5Avg();
+  const dailyVol = H - L;
+  const cost = avg5 * 0.10;
+  const wick = avg5 * 0.03;
+  const CR = (PC-L)/(H-L);
+  const H_PC = H-PC;
+
+  let range, stat1=NaN, stat2=NaN, stat1Label='', stat2Label='', pctOfDaily=NaN, pctOfAvg5=NaN, exceed30=false, exceed40=false;
+
+  if(pullbackType === 'UL'){
+    stat1 = H - pullbackVal; stat2 = PC - pullbackVal;
+    stat1Label = 'H-UL'; stat2Label = 'PC-UL';
+    range = stat1;
+  } else if(pullbackType === 'UH'){
+    stat1 = pullbackVal - L; stat2 = pullbackVal - PC;
+    stat1Label = 'UH-L'; stat2Label = 'UH-PC';
+    range = stat1;
+  } else {
+    range = H - L;
+  }
+
+  if(pullbackType !== 'none'){
+    pctOfDaily = stat1/dailyVol*100;
+    pctOfAvg5 = stat1/avg5*100;
+    exceed30 = pctOfDaily>30; exceed40 = pctOfAvg5>40;
+  }
+
+  const doubleCost = cost*2;
+  const R = (range - doubleCost)/cost;
+  const judgeLabel = renderJudge(R, threshold);
+
+  $('lbl-hpc').textContent = 'H − PC';
+  $('s-hpc').textContent = fmt(H_PC);
+
+  if(pullbackType !== 'none'){
+    $('pullback-stats').style.display = 'grid';
+    $('lbl-stat1').textContent = stat1Label.replace('-',' − ');
+    $('lbl-stat2').textContent = stat2Label.replace('-',' − ');
+    $('s-stat1').textContent = fmt(stat1);
+    $('s-stat2').textContent = fmt(stat2);
+    $('card-distance').style.display = 'block';
+    $('lbl-pct1').textContent = `${stat1Label} ÷ 單日波幅`;
+    $('lbl-pct2').textContent = `${stat1Label} ÷ 5日均幅`;
+    $('s-pct1').textContent = fmtPct(pctOfDaily)+(exceed30?' ⚠️':'');
+    $('s-pct2').textContent = fmtPct(pctOfAvg5)+(exceed40?' ⚠️':'');
+  } else {
+    $('pullback-stats').style.display = 'none';
+    $('card-distance').style.display = 'none';
+  }
+
+  $('range-label').textContent = pullbackType==='none' ? '多空區間距離（H-L代替）' : '多空區間距離';
+  $('s-dailyvol').textContent = fmt(dailyVol);
+  $('s-avg5').textContent = fmt(avg5);
+  $('s-cost').textContent = fmt(cost);
+  $('s-wick').textContent = fmt(wick)+' 小點';
+  $('s-cr').textContent = fmt(CR,2);
+  $('s-range').textContent = fmt(range)+'U';
+  $('s-doublecost').textContent = fmt(doubleCost)+'U';
+
+  drawLadder(L, pullbackVal, PC, H, pullbackType);
+
+  const d = {date, dailyVol, avg5, cost, wick, H, L, PC, CR, H_PC, type:pullbackType, pullbackVal,
+    stat1, stat2, stat1Label, stat2Label, pctOfDaily, pctOfAvg5, exceed30, exceed40, range, doubleCost, R, judgeLabel, threshold};
+  lastCalc = d;
+  $('report').textContent = buildReport(reportMode, d);
+  $('results').style.display = 'block';
+  $('empty-hint').style.display = 'none';
+  showToast('已計算並儲存 ✓');
+}
+
+function getStratFields(){
+  const getPillVal = (name) => {
+    const active = document.querySelector(`.pill-row[data-strat="${name}"] .pill.active`);
+    return active ? active.dataset.v : '';
+  };
+  return {
+    d1: getPillVal('d1'), h4: getPillVal('h4'), h1: getPillVal('h1'),
+    nearBreak: getPillVal('nearBreak'),
+    specialType: getPillVal('specialType'), specialNote: $('strat-specialNote').value,
+    module: $('strat-module').value, phrase: $('strat-phrase').value,
+    highAnalysis: $('strat-highAnalysis').value, lowAnalysis: $('strat-lowAnalysis').value,
+    riseAnalysis: $('strat-riseAnalysis').value, fallAnalysis: $('strat-fallAnalysis').value,
+    upReversal: $('strat-upReversal').value, downReversal: $('strat-downReversal').value
+  };
+}
+
+function buildStratSection(mode, s){
+  const lines = [];
+  const trendLine = `▫ 趨勢：D1(${s.d1||'—'}行情)/H4(${s.h4||'—'}行情)/H1(${s.h1||'—'}行情)`;
+  const judgeLine = `▫ 關盤價接近突破口：${s.nearBreak||'—'}`;
+  const specialLine = `▫ 特殊盤型：${s.specialType||'—'}${s.specialType==='有' && s.specialNote ? '（'+s.specialNote+'）' : ''}`;
+
+  lines.push(trendLine, judgeLine, specialLine);
+  if(s.module) lines.push(`▫ 策略模組：${s.module}`);
+  if(s.phrase) lines.push(`▫ 策略語句：${s.phrase}`);
+
+  const detailPairs = [
+    ['突破口高點分析', s.highAnalysis], ['突破口低點分析', s.lowAnalysis],
+    ['起漲點分析', s.riseAnalysis], ['小起跌點分析', s.fallAnalysis],
+    ['上漲行情反轉', s.upReversal], ['下跌行情反轉', s.downReversal]
+  ];
+  detailPairs.forEach(([label, val])=>{
+    if(val && val.trim()) lines.push(`▫ ${label}：${val.trim()}`);
+  });
+
+  if(mode === 'compact') return lines.join('\n');
+  return `策略解析：\n` + lines.join('\n');
+}
+
+function updateReport(){
+  if(!lastCalc) return;
+  $('report').textContent = buildReport(reportMode, lastCalc);
+}
+
+document.querySelectorAll('.pill-row[data-strat]').forEach(row=>{
+  row.querySelectorAll('.pill').forEach(p=>{
+    p.addEventListener('click', ()=>{
+      row.querySelectorAll('.pill').forEach(x=>x.classList.remove('active'));
+      p.classList.add('active');
+      if(row.dataset.strat === 'specialType'){
+        $('special-note-row').style.display = p.dataset.v === '有' ? 'grid' : 'none';
+      }
+      updateReport();
+    });
+  });
+});
+['strat-specialNote','strat-module','strat-phrase','strat-highAnalysis','strat-lowAnalysis','strat-riseAnalysis','strat-fallAnalysis','strat-upReversal','strat-downReversal'].forEach(id=>{
+  $(id).addEventListener('input', updateReport);
+});
+
+$('btn-save5').addEventListener('click', saveFiveDay);
+$('btn-calc').addEventListener('click', calculate);
+
+$('pullback-type').querySelectorAll('.pill').forEach(p=>{
+  p.addEventListener('click', ()=>{
+    $('pullback-type').querySelectorAll('.pill').forEach(x=>x.classList.remove('active'));
+    p.classList.add('active');
+    pullbackType = p.dataset.type;
+    if(pullbackType === 'none'){
+      $('pullback-value-row').style.display = 'none';
+    } else {
+      $('pullback-value-row').style.display = 'grid';
+      $('pullback-value-label').textContent = pullbackType==='UL' ? '回調低點 UL 數值' : '回調高點 UH 數值';
+    }
+  });
+});
+
+document.querySelectorAll('#results .pill-row .pill').forEach(p=>{
+  p.addEventListener('click', ()=>{
+    const row = p.parentElement;
+    row.querySelectorAll('.pill').forEach(x=>x.classList.remove('active'));
+    p.classList.add('active');
+    reportMode = p.dataset.mode;
+    if(lastCalc) $('report').textContent = buildReport(reportMode, lastCalc);
+  });
+});
+
+$('btn-copy').addEventListener('click', async ()=>{
+  const text = $('report').textContent;
+  try{ await navigator.clipboard.writeText(text); showToast('已複製到剪貼簿 ✓'); }
+  catch(e){
+    const ta = document.createElement('textarea'); ta.value = text;
+    document.body.appendChild(ta); ta.select(); document.execCommand('copy');
+    document.body.removeChild(ta); showToast('已複製到剪貼簿 ✓');
+  }
+});
+
+(async function init(){
+  entries = await loadEntries();
+  renderFiveDayTable();
+  const avg5 = get5Avg();
+  $('avg5-readout').textContent = fmt(avg5);
+  const dates = last5Dates();
+  const todayIso = dates[dates.length-1];
+  selectedDate = todayIso;
+  const existing = entries.find(e=>e.date===todayIso);
+  if(existing){ $('in-H').value = existing.high; $('in-L').value = existing.low; }
+  $('active-date-badge').textContent = '目前分析日期：' + todayIso;
+  renderFiveDayTable();
+})();
+</script>
+</body>
+</html>
