@@ -35,7 +35,8 @@
     padding:11px 10px; color:var(--text); font-family:'JetBrains Mono',monospace; font-size:15px; width:100%;
   }
   input:focus{outline:none; border-color:var(--gold);}
-  input:read-only{opacity:0.65;}
+  input:read-only{opacity:0.65; cursor:default;}
+  input:read-only:focus{border-color:var(--border);}
   input::-webkit-outer-spin-button, input::-webkit-inner-spin-button{opacity:0.4;}
   textarea{
     background:var(--surface-2); border:1px solid var(--border); border-radius:8px;
@@ -64,6 +65,8 @@
 
   .ladder-wrap{margin:6px 0 4px;}
   svg{display:block; width:100%; height:auto;}
+  .ladder-caption{font-size:11px; color:var(--text-dim); text-align:center; margin-top:2px;}
+  .ladder-caption.warn{color:var(--red); font-weight:600;}
 
   .stat-grid{display:grid; grid-template-columns:1fr 1fr; gap:10px;}
   .stat{background:var(--surface-2); border-radius:10px; padding:10px 12px;}
@@ -180,6 +183,7 @@
     <div class="card">
       <div class="section-title">📏 區間量尺</div>
       <div class="ladder-wrap" id="ladder"></div>
+      <div class="ladder-caption" id="ladder-caption">紅色區塊：突破口往內 5Avg×10% 的成本領域</div>
     </div>
 
     <div class="card">
@@ -328,6 +332,7 @@ const fmtPct = n => isFinite(n) ? n.toFixed(1)+'%' : '—';
 
 let entries = [];
 let reportHistory = {}; // { '2026-07-19': '完整報表文字...' }
+let drafts = {}; // { '2026-07-19': {PC, pullbackType, pullbackVal, threshold, strat:{...}} }
 let selectedDate = null;
 let reportMode = 'full';
 let pullbackType = 'none'; // none | UL | UH
@@ -335,6 +340,16 @@ let lastCalc = null;
 let cloudOk = false;
 
 const LOCAL_KEY = 'gold-strategy-data';
+const DEFAULT_STRAT = {
+  d1:'震盪', h4:'震盪', h1:'震盪', nearBreak:'無', specialType:'無', specialNote:'',
+  module:'', phrase:'', highAnalysis:'', lowAnalysis:'', riseAnalysis:'', fallAnalysis:'',
+  upReversal:'', downReversal:''
+};
+
+function debounce(fn, ms){
+  let t;
+  return (...args) => { clearTimeout(t); t = setTimeout(()=>fn(...args), ms); };
+}
 
 function isoDate(d){ return d.toISOString().slice(0,10); }
 
@@ -358,6 +373,7 @@ function loadLocal(){
     if(raw){
       const parsed = JSON.parse(raw);
       reportHistory = parsed.reportHistory || {};
+      drafts = parsed.drafts || {};
       return parsed.entries || [];
     }
   }catch(e){}
@@ -372,6 +388,7 @@ async function syncFromCloud(){
       const data = snap.data();
       entries = data.entries || [];
       reportHistory = data.reportHistory || {};
+      drafts = data.drafts || {};
     }
   }catch(e){
     console.error(e);
@@ -395,12 +412,19 @@ async function persistCloud(payload){
   updateStorageStatus();
 }
 
-async function persistAll(){
-  const payload = {entries, reportHistory};
+function saveLocalOnly(){
+  const payload = {entries, reportHistory, drafts};
   try{ localStorage.setItem(LOCAL_KEY, JSON.stringify(payload)); }
   catch(e){ console.error(e); }
+  return payload;
+}
+
+async function persistAll(){
+  const payload = saveLocalOnly();
   persistCloud(payload); // 背景同步，不卡住畫面回饋
 }
+
+const persistCloudDebounced = debounce(()=>{ persistCloud(saveLocalOnly()); }, 700);
 
 function downloadReportHistory(){
   const dates = Object.keys(reportHistory).sort();
@@ -465,6 +489,7 @@ function renderFiveDayTable(){
       $('in-H').value = isFinite(high) ? high : '';
       $('in-L').value = isFinite(low) ? low : '';
       $('active-date-badge').textContent = '目前分析日期：' + date;
+      applyDraft(date);
       renderFiveDayTable();
     });
   });
@@ -518,24 +543,45 @@ function get5Avg(){
   return last5.reduce((s,e)=>s+(e.high-e.low),0)/last5.length;
 }
 
-function drawLadder(L, pullbackVal, PC, H, type){
+function drawLadder(L, pullbackVal, PC, H, type, cost){
   const pts = [{v:L,label:'L',color:'var(--red)'},{v:PC,label:'PC',color:'var(--gold-bright)'},{v:H,label:'H',color:'var(--green)'}];
   if(type !== 'none') pts.push({v:pullbackVal, label:type, color:'var(--amber)'});
-  pts.sort((a,b)=>a.v-b.v);
-  const min = Math.min(...pts.map(p=>p.v)), max = Math.max(...pts.map(p=>p.v));
+
+  const bandHBottom = H - cost, bandHTop = H;
+  const bandLBottom = L, bandLTop = L + cost;
+  const pcInCostZone = (PC <= bandHTop && PC >= bandHBottom) || (PC >= bandLBottom && PC <= bandLTop);
+
+  const boundaryVals = [...pts.map(p=>p.v), bandHBottom, bandHTop, bandLBottom, bandLTop];
+  const min = Math.min(...boundaryVals), max = Math.max(...boundaryVals);
   const range = (max-min)||1;
   const pad=30, W=480, Hh=70;
   const x = v => pad + ((v-min)/range)*(W-pad*2);
+
   let svg = `<svg viewBox="0 0 ${W} ${Hh}" xmlns="http://www.w3.org/2000/svg">`;
+
+  const bandY = 30, bandH = 20;
+  [[bandHBottom,bandHTop],[bandLBottom,bandLTop]].forEach(([a,b])=>{
+    const xa = x(a), xb = x(b);
+    svg += `<rect x="${Math.min(xa,xb)}" y="${bandY}" width="${Math.max(Math.abs(xb-xa),1)}" height="${bandH}" fill="var(--red)" fill-opacity="0.15"/>`;
+  });
+
   svg += `<line x1="${pad}" y1="40" x2="${W-pad}" y2="40" stroke="var(--border)" stroke-width="2"/>`;
   pts.forEach(p=>{
     const px = x(p.v);
-    svg += `<circle cx="${px}" cy="40" r="6" fill="${p.color}" stroke="var(--bg)" stroke-width="2"/>`;
-    svg += `<text x="${px}" y="24" font-family="JetBrains Mono, monospace" font-size="11" fill="${p.color}" text-anchor="middle" font-weight="700">${p.label}</text>`;
+    const flagged = p.label === 'PC' && pcInCostZone;
+    const color = flagged ? 'var(--red)' : p.color;
+    svg += `<circle cx="${px}" cy="40" r="6" fill="${color}" stroke="var(--bg)" stroke-width="2"/>`;
+    svg += `<text x="${px}" y="24" font-family="JetBrains Mono, monospace" font-size="11" fill="${color}" text-anchor="middle" font-weight="700">${p.label}${flagged ? ' ⚠' : ''}</text>`;
     svg += `<text x="${px}" y="60" font-family="JetBrains Mono, monospace" font-size="10" fill="var(--text-dim)" text-anchor="middle">${fmt(p.v)}</text>`;
   });
   svg += `</svg>`;
   $('ladder').innerHTML = svg;
+
+  const caption = $('ladder-caption');
+  caption.textContent = pcInCostZone
+    ? '⚠ 關盤價落在成本領域內（紅色區塊：突破口往內 5Avg×10%）'
+    : '紅色區塊：突破口往內 5Avg×10% 的成本領域';
+  caption.classList.toggle('warn', pcInCostZone);
 }
 
 function renderJudge(R, threshold){
@@ -671,7 +717,7 @@ async function calculate(){
   $('s-range').textContent = fmt(range)+'U';
   $('s-doublecost').textContent = fmt(doubleCost)+'U';
 
-  drawLadder(L, pullbackVal, PC, H, pullbackType);
+  drawLadder(L, pullbackVal, PC, H, pullbackType, cost);
 
   const d = {date, dailyVol, avg5, cost, wick, H, L, PC, CR, H_PC, type:pullbackType, pullbackVal,
     stat1, stat2, stat1Label, stat2Label, pctOfDaily, pctOfAvg5, exceed30, exceed40, range, doubleCost, R, judgeLabel, threshold};
@@ -682,6 +728,57 @@ async function calculate(){
   $('results').style.display = 'block';
   $('empty-hint').style.display = 'none';
   showToast('已計算並儲存 ✓');
+}
+
+function captureDraft(){
+  return {
+    PC: $('in-PC').value,
+    pullbackType,
+    pullbackVal: $('in-pullback').value,
+    threshold: $('in-threshold').value,
+    strat: getStratFields()
+  };
+}
+
+function setStratFields(s){
+  const vals = Object.assign({}, DEFAULT_STRAT, s);
+  ['d1','h4','h1','nearBreak','specialType'].forEach(name=>{
+    const row = document.querySelector(`.pill-row[data-strat="${name}"]`);
+    row.querySelectorAll('.pill').forEach(p=>p.classList.toggle('active', p.dataset.v === vals[name]));
+  });
+  $('special-note-row').style.display = vals.specialType === '有' ? 'grid' : 'none';
+  $('strat-specialNote').value = vals.specialNote;
+  $('strat-module').value = vals.module;
+  $('strat-phrase').value = vals.phrase;
+  $('strat-highAnalysis').value = vals.highAnalysis;
+  $('strat-lowAnalysis').value = vals.lowAnalysis;
+  $('strat-riseAnalysis').value = vals.riseAnalysis;
+  $('strat-fallAnalysis').value = vals.fallAnalysis;
+  $('strat-upReversal').value = vals.upReversal;
+  $('strat-downReversal').value = vals.downReversal;
+}
+
+function applyDraft(date){
+  const d = drafts[date] || {};
+  $('in-PC').value = d.PC || '';
+  $('in-threshold').value = d.threshold || '3.0';
+  pullbackType = d.pullbackType || 'none';
+  $('pullback-type').querySelectorAll('.pill').forEach(p=>p.classList.toggle('active', p.dataset.type === pullbackType));
+  $('in-pullback').value = d.pullbackVal || '';
+  if(pullbackType === 'none'){
+    $('pullback-value-row').style.display = 'none';
+  } else {
+    $('pullback-value-row').style.display = 'grid';
+    $('pullback-value-label').textContent = pullbackType==='UL' ? '回調低點 UL 數值' : '回調高點 UH 數值';
+  }
+  setStratFields(d.strat || {});
+}
+
+function saveDraftNow(){
+  if(!selectedDate) return;
+  drafts[selectedDate] = captureDraft();
+  saveLocalOnly();
+  persistCloudDebounced();
 }
 
 function getStratFields(){
@@ -737,15 +834,20 @@ document.querySelectorAll('.pill-row[data-strat]').forEach(row=>{
         $('special-note-row').style.display = p.dataset.v === '有' ? 'grid' : 'none';
       }
       updateReport();
+      saveDraftNow();
     });
   });
 });
 ['strat-specialNote','strat-module','strat-phrase','strat-highAnalysis','strat-lowAnalysis','strat-riseAnalysis','strat-fallAnalysis','strat-upReversal','strat-downReversal'].forEach(id=>{
-  $(id).addEventListener('input', updateReport);
+  $(id).addEventListener('input', ()=>{ updateReport(); saveDraftNow(); });
 });
 
 $('btn-save5').addEventListener('click', saveFiveDay);
 $('btn-calc').addEventListener('click', calculate);
+
+$('in-PC').addEventListener('input', saveDraftNow);
+$('in-pullback').addEventListener('input', saveDraftNow);
+$('in-threshold').addEventListener('input', saveDraftNow);
 
 $('pullback-type').querySelectorAll('.pill').forEach(p=>{
   p.addEventListener('click', ()=>{
@@ -758,6 +860,7 @@ $('pullback-type').querySelectorAll('.pill').forEach(p=>{
       $('pullback-value-row').style.display = 'grid';
       $('pullback-value-label').textContent = pullbackType==='UL' ? '回調低點 UL 數值' : '回調高點 UH 數值';
     }
+    saveDraftNow();
   });
 });
 
@@ -790,6 +893,7 @@ function refreshDateUI(){
   const existing = entries.find(e=>e.date===todayIso);
   if(existing){ $('in-H').value = existing.high; $('in-L').value = existing.low; }
   $('active-date-badge').textContent = '目前分析日期：' + todayIso;
+  applyDraft(todayIso);
   renderFiveDayTable();
 }
 
