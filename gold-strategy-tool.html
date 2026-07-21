@@ -116,6 +116,11 @@
     <div class="subtitle">先填五日高低點，再輸入當日關鍵價位</div>
   </header>
 
+  <div class="card" id="storage-card">
+    <div class="section-title">☁️ 雲端同步</div>
+    <div class="notice" id="storage-status">連線中…</div>
+  </div>
+
   <details style="margin-bottom:14px;">
     <summary>📖 縮寫名詞解釋（點擊展開）</summary>
     <div class="glossary-table">
@@ -289,6 +294,7 @@
       </div>
       <div id="report"></div>
       <button class="btn btn-ghost" id="btn-copy">📋 複製文字</button>
+      <button class="btn btn-ghost" id="btn-download-history">📥 下載策略紀錄（全部天數）</button>
     </div>
   </div>
 
@@ -297,27 +303,112 @@
 
 <div class="toast" id="toast"></div>
 
-<script>
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+import {
+  getFirestore, doc, getDoc, setDoc
+} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+
+const firebaseConfig = {
+  apiKey: "AIzaSyCgH9uP_QesoiQCPoqqjNawb180V3GsZ84",
+  authDomain: "gold-strategy-tool.firebaseapp.com",
+  projectId: "gold-strategy-tool",
+  storageBucket: "gold-strategy-tool.firebasestorage.app",
+  messagingSenderId: "403538637990",
+  appId: "1:403538637990:web:85f86663c72e611c5f7067"
+};
+
+const firebaseApp = initializeApp(firebaseConfig);
+const db = getFirestore(firebaseApp);
+const sharedDocRef = doc(db, 'goldTool', 'sharedData');
+
 const $ = id => document.getElementById(id);
 const fmt = (n,d=2) => isFinite(n) ? n.toFixed(d) : '—';
 const fmtPct = n => isFinite(n) ? n.toFixed(1)+'%' : '—';
 
 let entries = [];
+let reportHistory = {}; // { '2026-07-19': '完整報表文字...' }
 let selectedDate = null;
 let reportMode = 'full';
 let pullbackType = 'none'; // none | UL | UH
 let lastCalc = null;
+let cloudOk = false;
+
+const LOCAL_KEY = 'gold-strategy-data';
 
 function isoDate(d){ return d.toISOString().slice(0,10); }
 
-async function loadEntries(){
-  try{ const res = await window.storage.get('gold-entries', false); if(res && res.value) return JSON.parse(res.value); }
-  catch(e){}
+function withTimeout(promise, ms){
+  return Promise.race([
+    promise,
+    new Promise((_, reject) => setTimeout(()=>reject(new Error('timeout')), ms))
+  ]);
+}
+
+function updateStorageStatus(){
+  const el = $('storage-status');
+  el.textContent = cloudOk
+    ? '已連上雲端共用資料，電腦與手機會自動同步'
+    : '雲端連線失敗，資料暫存於本機瀏覽器（請檢查 Firestore 是否已建立、網路是否正常）';
+}
+
+function loadLocal(){
+  try{
+    const raw = localStorage.getItem(LOCAL_KEY);
+    if(raw){
+      const parsed = JSON.parse(raw);
+      reportHistory = parsed.reportHistory || {};
+      return parsed.entries || [];
+    }
+  }catch(e){}
   return [];
 }
-async function persistEntries(){
-  try{ await window.storage.set('gold-entries', JSON.stringify(entries), false); }
+
+async function syncFromCloud(){
+  try{
+    const snap = await withTimeout(getDoc(sharedDocRef), 8000);
+    cloudOk = true;
+    if(snap.exists()){
+      const data = snap.data();
+      entries = data.entries || [];
+      reportHistory = data.reportHistory || {};
+    }
+  }catch(e){
+    console.error(e);
+    cloudOk = false;
+  }
+  updateStorageStatus();
+  renderFiveDayTable();
+  $('avg5-readout').textContent = fmt(get5Avg());
+  refreshDateUI();
+}
+
+async function persistAll(){
+  const payload = {entries, reportHistory};
+  try{ localStorage.setItem(LOCAL_KEY, JSON.stringify(payload)); }
   catch(e){ console.error(e); }
+  try{
+    await withTimeout(setDoc(sharedDocRef, payload), 8000);
+    cloudOk = true;
+  }catch(e){
+    console.error(e);
+    cloudOk = false;
+    showToast('雲端同步失敗，已暫存本機', true);
+  }
+  updateStorageStatus();
+}
+
+function downloadReportHistory(){
+  const dates = Object.keys(reportHistory).sort();
+  if(!dates.length){ showToast('尚無策略紀錄可下載', true); return; }
+  const text = dates.map(d => reportHistory[d]).join('\n\n' + '='.repeat(40) + '\n\n');
+  const blob = new Blob([text], {type: 'text/plain;charset=utf-8'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = 'gold-strategy-history.txt';
+  document.body.appendChild(a); a.click(); document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+  showToast('已下載策略紀錄 ✓');
 }
 
 function showToast(msg, isErr){
@@ -409,7 +500,7 @@ async function saveFiveDay(){
   rowsData.forEach(r=>{ entries = entries.filter(e=>e.date !== r.date); entries.push(r); });
   entries.sort((a,b)=>a.date.localeCompare(b.date));
   if(entries.length>30) entries = entries.slice(-30);
-  await persistEntries();
+  await persistAll();
 
   const avg5 = get5Avg();
   $('avg5-readout').textContent = fmt(avg5);
@@ -515,7 +606,6 @@ async function calculate(){
   entries.push({date, high:H, low:L});
   entries.sort((a,b)=>a.date.localeCompare(b.date));
   if(entries.length>30) entries = entries.slice(-30);
-  await persistEntries();
   renderFiveDayTable();
 
   const avg5 = get5Avg();
@@ -583,6 +673,8 @@ async function calculate(){
     stat1, stat2, stat1Label, stat2Label, pctOfDaily, pctOfAvg5, exceed30, exceed40, range, doubleCost, R, judgeLabel, threshold};
   lastCalc = d;
   $('report').textContent = buildReport(reportMode, d);
+  reportHistory[date] = buildReport('full', d);
+  await persistAll();
   $('results').style.display = 'block';
   $('empty-hint').style.display = 'none';
   showToast('已計算並儲存 ✓');
@@ -675,6 +767,8 @@ document.querySelectorAll('#results .pill-row .pill').forEach(p=>{
   });
 });
 
+$('btn-download-history').addEventListener('click', downloadReportHistory);
+
 $('btn-copy').addEventListener('click', async ()=>{
   const text = $('report').textContent;
   try{ await navigator.clipboard.writeText(text); showToast('已複製到剪貼簿 ✓'); }
@@ -685,11 +779,7 @@ $('btn-copy').addEventListener('click', async ()=>{
   }
 });
 
-(async function init(){
-  entries = await loadEntries();
-  renderFiveDayTable();
-  const avg5 = get5Avg();
-  $('avg5-readout').textContent = fmt(avg5);
+function refreshDateUI(){
   const dates = last5Dates();
   const todayIso = dates[dates.length-1];
   selectedDate = todayIso;
@@ -697,6 +787,14 @@ $('btn-copy').addEventListener('click', async ()=>{
   if(existing){ $('in-H').value = existing.high; $('in-L').value = existing.low; }
   $('active-date-badge').textContent = '目前分析日期：' + todayIso;
   renderFiveDayTable();
+}
+
+(function init(){
+  entries = loadLocal();
+  renderFiveDayTable();
+  $('avg5-readout').textContent = fmt(get5Avg());
+  refreshDateUI();
+  syncFromCloud();
 })();
 </script>
 </body>
