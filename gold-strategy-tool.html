@@ -58,8 +58,17 @@
   .btn-secondary{background:var(--surface-2); color:var(--gold-bright); border:1px solid var(--gold); margin-bottom:0;}
   .btn-ghost{background:transparent; border:1px solid var(--border); color:var(--text-dim); margin-top:8px;}
 
-  .fiveday-row{display:grid; grid-template-columns:28px 1fr 1fr 1fr; gap:8px; align-items:center; padding:8px 0; border-bottom:1px solid var(--border);}
+  .fiveday-row{
+    display:grid; grid-template-columns:28px 1fr 1fr;
+    grid-template-areas:"chk date date" "chk high low";
+    gap:6px 8px; align-items:center; padding:8px 0; border-bottom:1px solid var(--border);
+  }
   .fiveday-row:last-child{border-bottom:none;}
+  .fiveday-row .chk{grid-area:chk;}
+  .fiveday-row .f-date{grid-area:date;}
+  .fiveday-row .f-high{grid-area:high;}
+  .fiveday-row .f-low{grid-area:low;}
+  .fiveday-row.fiveday-head{grid-template-columns:28px 1fr 1fr 1fr; grid-template-areas:none;}
   .fiveday-head{font-size:10px; color:var(--text-dim); text-transform:uppercase; letter-spacing:.5px;}
   .fiveday-row.error input{border-color:var(--red);}
   .chk{width:22px; height:22px; border-radius:6px; border:1.5px solid var(--border); background:var(--surface-2); cursor:pointer; position:relative; flex-shrink:0;}
@@ -331,7 +340,9 @@ const firebaseConfig = {
 
 const firebaseApp = initializeApp(firebaseConfig);
 const db = getFirestore(firebaseApp);
-const sharedDocRef = doc(db, 'goldTool', 'sharedData');
+const isLocalDev = ['localhost', '127.0.0.1'].includes(location.hostname);
+const sharedDocRef = doc(db, 'goldTool', isLocalDev ? 'devTestData' : 'sharedData');
+if(isLocalDev) console.warn('[dev] 本機測試環境，讀寫的是 goldTool/devTestData，不會動到正式資料 goldTool/sharedData');
 
 const $ = id => document.getElementById(id);
 const fmt = (n,d=2) => isFinite(n) ? n.toFixed(d) : '—';
@@ -340,6 +351,7 @@ const fmtPct = n => isFinite(n) ? n.toFixed(1)+'%' : '—';
 let entries = [];
 let reportHistory = {}; // { '2026-07-19': '完整報表文字...' }
 let drafts = {}; // { '2026-07-19': {PC, pullbackType, pullbackVal, threshold, strat:{...}} }
+let slotDates = []; // 5 個日期字串，完全由使用者手動控制的五日紀錄列
 let selectedDate = null;
 let reportMode = 'full';
 let pullbackType = 'none'; // none | UL | UH
@@ -381,6 +393,7 @@ function loadLocal(){
       const parsed = JSON.parse(raw);
       reportHistory = parsed.reportHistory || {};
       drafts = parsed.drafts || {};
+      slotDates = parsed.slotDates || [];
       return parsed.entries || [];
     }
   }catch(e){}
@@ -396,6 +409,7 @@ async function syncFromCloud(){
       entries = data.entries || [];
       reportHistory = data.reportHistory || {};
       drafts = data.drafts || {};
+      slotDates = data.slotDates || [];
     }
   }catch(e){
     console.error(e);
@@ -420,7 +434,7 @@ async function persistCloud(payload){
 }
 
 function saveLocalOnly(){
-  const payload = {entries, reportHistory, drafts};
+  const payload = {entries, reportHistory, drafts, slotDates};
   try{ localStorage.setItem(LOCAL_KEY, JSON.stringify(payload)); }
   catch(e){ console.error(e); }
   return payload;
@@ -458,20 +472,16 @@ function last5Dates(){
   return arr;
 }
 
-function buildFiveDayRows(){
-  const sorted = [...entries].sort((a,b)=>a.date.localeCompare(b.date));
-  let rows = sorted.slice(-5);
-  const dates = last5Dates();
-  while(rows.length < 5){
-    const missing = dates.filter(d=>!rows.find(r=>r.date===d));
-    rows.push({date: missing[0] || dates[rows.length], high:'', low:''});
-    rows.sort((a,b)=>a.date.localeCompare(b.date));
-  }
-  return rows.slice(-5);
+function getFiveDayRows(){
+  if(!slotDates || slotDates.length !== 5) slotDates = last5Dates();
+  return slotDates.map(date=>{
+    const found = date ? entries.find(e=>e.date===date) : null;
+    return {date: date||'', high: found ? found.high : '', low: found ? found.low : ''};
+  });
 }
 
 function renderFiveDayTable(){
-  const rows = buildFiveDayRows();
+  const rows = getFiveDayRows();
   const body = $('fiveday-body');
   body.innerHTML = '';
   rows.forEach((r, idx)=>{
@@ -480,9 +490,9 @@ function renderFiveDayTable(){
     const isSelected = r.date === selectedDate;
     row.innerHTML = `
       <div class="chk ${isSelected?'checked':''}" data-date="${r.date}"></div>
-      <div><input type="date" value="${r.date}" data-field="date" data-idx="${idx}"></div>
-      <div><input type="number" step="0.01" value="${r.high}" placeholder="高點" data-field="high" data-idx="${idx}"></div>
-      <div><input type="number" step="0.01" value="${r.low}" placeholder="低點" data-field="low" data-idx="${idx}"></div>
+      <div class="f-date"><input type="date" value="${r.date}" data-field="date" data-idx="${idx}"></div>
+      <div class="f-high"><input type="number" step="0.01" value="${r.high}" placeholder="高點" data-field="high" data-idx="${idx}"></div>
+      <div class="f-low"><input type="number" step="0.01" value="${r.low}" placeholder="低點" data-field="low" data-idx="${idx}"></div>
     `;
     body.appendChild(row);
   });
@@ -505,22 +515,26 @@ function renderFiveDayTable(){
 async function saveFiveDay(){
   const body = $('fiveday-body');
   const dateInputs = body.querySelectorAll('input[data-field=date]');
-  const rowsData = [];
   const badRows = [];
+  const newEntries = [];
+  const newSlotDates = [];
 
   dateInputs.forEach((dIn, idx)=>{
     const highInput = body.querySelector(`input[data-field=high][data-idx="${idx}"]`);
     const lowInput = body.querySelector(`input[data-field=low][data-idx="${idx}"]`);
-    const high = parseFloat(highInput.value);
-    const low = parseFloat(lowInput.value);
     highInput.parentElement.classList.remove('error');
     lowInput.parentElement.classList.remove('error');
-    if(dIn.value && highInput.value !== '' && lowInput.value !== ''){
+
+    const newDate = dIn.value;
+    newSlotDates.push(newDate);
+
+    if(newDate && highInput.value !== '' && lowInput.value !== ''){
+      const high = parseFloat(highInput.value);
+      const low = parseFloat(lowInput.value);
       if(low >= high){
-        badRows.push(dIn.value);
-        highInput.closest('.fiveday-row') || null;
+        badRows.push(newDate);
       } else {
-        rowsData.push({date: dIn.value, high, low});
+        newEntries.push({date:newDate, high, low});
       }
     }
   });
@@ -533,9 +547,8 @@ async function saveFiveDay(){
   }
   $('fiveday-error').style.display = 'none';
 
-  rowsData.forEach(r=>{ entries = entries.filter(e=>e.date !== r.date); entries.push(r); });
-  entries.sort((a,b)=>a.date.localeCompare(b.date));
-  if(entries.length>30) entries = entries.slice(-30);
+  entries = newEntries;
+  slotDates = newSlotDates;
   await persistAll();
 
   const avg5 = get5Avg();
