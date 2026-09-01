@@ -498,16 +498,16 @@ function renderFiveDayTable(){
   });
   body.querySelectorAll('.chk').forEach(chk=>{
     chk.addEventListener('click', ()=>{
-      const date = chk.dataset.date;
-      selectedDate = date;
       const rowInputs = chk.parentElement.querySelectorAll('input');
+      const date = rowInputs[0].value; // 讀取當下欄位裡的值，避免用到尚未儲存前的舊日期
+      selectedDate = date;
       const high = parseFloat(rowInputs[1].value);
       const low = parseFloat(rowInputs[2].value);
       $('in-H').value = isFinite(high) ? high : '';
       $('in-L').value = isFinite(low) ? low : '';
       $('active-date-badge').textContent = '目前分析日期：' + date;
       applyDraft(date);
-      renderFiveDayTable();
+      body.querySelectorAll('.chk').forEach(c=>c.classList.toggle('checked', c===chk));
     });
   });
 }
