@@ -183,6 +183,14 @@
       <div class="field full"><label id="pullback-value-label">回調點數值</label><input type="number" step="0.01" id="in-pullback"></div>
     </div>
 
+    <div class="field full" id="b1-direction-row" style="display:none; margin-bottom:10px;">
+      <label style="display:block; margin-bottom:8px;">B1 今日走勢方向</label>
+      <div class="pill-row" data-strat="b1Direction">
+        <div class="pill active" data-v="上漲">上漲（先低後高）</div>
+        <div class="pill" data-v="下跌">下跌（先高後低）</div>
+      </div>
+    </div>
+
     <div class="field-row">
       <div class="field full"><label>關盤價 PC</label><input type="number" step="0.01" id="in-PC" placeholder="4052.60"></div>
     </div>
@@ -270,6 +278,10 @@
         <div class="pill active" data-v="無">無</div><div class="pill" data-v="有">有</div>
       </div>
       <div class="field full" id="special-note-row" style="display:none; margin-bottom:10px;">
+        <label style="display:block; margin-bottom:8px;">特殊盤型類型</label>
+        <div class="pill-row" data-strat="specialSubType">
+          <div class="pill active" data-v="V型震盪">V型震盪</div><div class="pill" data-v="其他">其他</div>
+        </div>
         <input type="text" id="strat-specialNote" placeholder="特殊盤型說明">
       </div>
 
@@ -281,29 +293,37 @@
         <label>策略語句</label>
         <input type="text" id="strat-phrase" placeholder="例：破突破口高點或美盤回調低點，才可參考反轉訊號提醒">
       </div>
-      <div class="field full" style="margin-bottom:10px;">
-        <label>突破口高點分析</label>
-        <textarea id="strat-highAnalysis" rows="2" placeholder="下方領域內是否有適合損益比分析線可參考…"></textarea>
+      <div class="field full" id="row-highAnalysis" style="margin-bottom:10px;">
+        <label id="lbl-highAnalysis">突破口高點分析</label>
+        <textarea id="strat-highAnalysis" rows="2"></textarea>
       </div>
-      <div class="field full" style="margin-bottom:10px;">
-        <label>突破口低點分析</label>
-        <textarea id="strat-lowAnalysis" rows="2" placeholder="上方領域內是否有適合損益比分析線可參考…"></textarea>
+      <div class="field full" id="row-lowAnalysis" style="margin-bottom:10px;">
+        <label id="lbl-lowAnalysis">突破口低點分析</label>
+        <textarea id="strat-lowAnalysis" rows="2"></textarea>
       </div>
-      <div class="field full" style="margin-bottom:10px;">
+      <div class="field full" id="row-riseAnalysis" style="margin-bottom:10px;">
         <label>起漲點分析</label>
-        <textarea id="strat-riseAnalysis" rows="2" placeholder="若亞盤上漲破突破口高點，標注日內低點為起漲點…"></textarea>
+        <textarea id="strat-riseAnalysis" rows="2"></textarea>
       </div>
-      <div class="field full" style="margin-bottom:10px;">
+      <div class="field full" id="row-fallStartAnalysis" style="margin-bottom:10px;">
+        <label>起跌點分析</label>
+        <textarea id="strat-fallStartAnalysis" rows="2"></textarea>
+      </div>
+      <div class="field full" id="row-fallAnalysis" style="margin-bottom:10px;">
         <label>小起跌點分析</label>
-        <textarea id="strat-fallAnalysis" rows="2" placeholder="若亞盤下跌破美盤回調低點，標注日內高點為小起跌點…"></textarea>
+        <textarea id="strat-fallAnalysis" rows="2"></textarea>
+      </div>
+      <div class="field full" id="row-smallRiseAnalysis" style="margin-bottom:10px;">
+        <label>小起漲點分析</label>
+        <textarea id="strat-smallRiseAnalysis" rows="2"></textarea>
       </div>
       <div class="field full" style="margin-bottom:10px;">
         <label>萬能策略：上漲行情反轉</label>
-        <textarea id="strat-upReversal" rows="2" placeholder="需破突破口高點，待日內最高點出轉空訊號，收下關鍵分析線…"></textarea>
+        <textarea id="strat-upReversal" rows="2" placeholder="若日內走一段上漲行情（需破突破口高點/美盤回調高點），可待上漲日內最高點出【轉空訊號】，且收下關鍵分析線可評估空單，止損可設轉空訊號高點上方+1美金。⚠️ 注意若實際損益比不佳可取消進場。"></textarea>
       </div>
       <div class="field full" style="margin-bottom:0;">
         <label>萬能策略：下跌行情反轉</label>
-        <textarea id="strat-downReversal" rows="2" placeholder="需破美盤回調低點，待日內最低點出轉多訊號，收上關鍵分析線…"></textarea>
+        <textarea id="strat-downReversal" rows="2" placeholder="若日內走一段下跌行情（需破回調低點/突破口低點），可待下跌日內最低點出現【轉多訊號】，且收上關鍵分析線可評估多單，止損可設轉多訊號低點下方-0.5美金。⚠️ 注意若實際損益比不佳可取消進場。"></textarea>
       </div>
     </div>
 
@@ -361,8 +381,20 @@ let cloudOk = false;
 const LOCAL_KEY = 'gold-strategy-data';
 const DEFAULT_STRAT = {
   d1:'震盪', h4:'震盪', h1:'震盪', nearBreak:'無', specialType:'無', specialNote:'',
-  module:'', phrase:'', highAnalysis:'', lowAnalysis:'', riseAnalysis:'', fallAnalysis:'',
-  upReversal:'', downReversal:''
+  specialSubType:'V型震盪', b1Direction:'上漲',
+  module:'', phrase:'', highAnalysis:'', lowAnalysis:'', riseAnalysis:'', fallStartAnalysis:'',
+  fallAnalysis:'', smallRiseAnalysis:'', upReversal:'', downReversal:''
+};
+
+const ANALYSIS_TEXT = {
+  highPlain: '突破口高點下方領域內沒有適合損益比分析線可參考收盤，無法規劃兩個條件空單策略。⚠️ 若亞盤上探不破突破口高點，有機會看跌，激進空單止損可設於「突破口高點+1」美金【SL=】。',
+  lowPlain: '突破口低點上方領域內沒有適合損益比分析線可參考收盤，無法規劃兩個條件多單策略。⚠️ 若亞盤下探不破突破口低點，有機會看漲，激進多單止損可設於「突破口低點-0.5」美金【SL=】。',
+  lowPullback: '美盤回調低點上方領域內沒有適合損益比分析線可參考收盤，無法規劃兩個條件多單策略。⚠️ 若亞盤下跌至突破口低點守住不破，有機會看漲，激進多單止損可設於「突破口低點-0.5」美金【SL=】。',
+  highPullback: '美盤回調高點下方領域內沒有適合損益比分析線可參考收盤，無法規劃兩個條件空單策略。⚠️ 若亞盤上漲至突破口高點守住不破，有機會看跌，激進空單止損可設於「突破口高點+1」美金【SL=】。',
+  rise: '若亞盤上漲破突破口高點，可標注日內低點為〔起漲點〕。⚠️ 若行情回落不破〔起漲點〕，有機會看漲，投機多單止損可設於「〔起漲點〕-0.5美金」。',
+  fallStart: '若亞盤下跌破突破口低點，可標注日內高點為〔起跌點〕。⚠️ 若行情回升不破〔起跌點〕，有機會看跌，投機空單止損可設於「〔起跌點〕+1美金」。',
+  smallFall: '若亞盤下跌破回調低點，可標注日內高點為〔小起跌點〕。⚠️ 若行情回調不破〔小起跌點〕，有機會看跌，投機空單止損可設於「〔小起跌點〕+1美金」。（若開盤下跳突破位回調低點，不參考小起跌點）',
+  smallRise: '若亞盤上漲破回調高點，可標注日內低點為〔小起漲點〕。⚠️ 若行情回調不破〔小起漲點〕，有機會看漲，投機多單止損可設於「〔小起漲點〕-0.5美金」。（若開盤上跳突破位回調高點，不參考小起漲點）'
 };
 
 function debounce(fn, ms){
@@ -762,7 +794,7 @@ function captureDraft(){
 
 function setStratFields(s){
   const vals = Object.assign({}, DEFAULT_STRAT, s);
-  ['d1','h4','h1','nearBreak','specialType'].forEach(name=>{
+  ['d1','h4','h1','nearBreak','specialType','specialSubType','b1Direction'].forEach(name=>{
     const row = document.querySelector(`.pill-row[data-strat="${name}"]`);
     row.querySelectorAll('.pill').forEach(p=>p.classList.toggle('active', p.dataset.v === vals[name]));
   });
@@ -773,9 +805,75 @@ function setStratFields(s){
   $('strat-highAnalysis').value = vals.highAnalysis;
   $('strat-lowAnalysis').value = vals.lowAnalysis;
   $('strat-riseAnalysis').value = vals.riseAnalysis;
+  $('strat-fallStartAnalysis').value = vals.fallStartAnalysis;
   $('strat-fallAnalysis').value = vals.fallAnalysis;
+  $('strat-smallRiseAnalysis').value = vals.smallRiseAnalysis;
   $('strat-upReversal').value = vals.upReversal;
   $('strat-downReversal').value = vals.downReversal;
+  updateAnalysisFieldsVisibility();
+}
+
+function getModuleFieldConfig(pType, s){
+  const isVShape = s.specialType === '有' && s.specialSubType === 'V型震盪';
+  if(isVShape){
+    return {
+      high: {show:true, label:'突破口高點分析', text:ANALYSIS_TEXT.highPlain},
+      low: {show:true, label:'突破口低點分析', text:ANALYSIS_TEXT.lowPlain},
+      rise: {show:true, text:ANALYSIS_TEXT.rise},
+      fallStart: {show:true, text:ANALYSIS_TEXT.fallStart},
+      smallFall: {show:false},
+      smallRise: {show:false}
+    };
+  }
+  if(pType === 'UL'){
+    return {
+      high: {show:true, label:'突破口高點分析', text:ANALYSIS_TEXT.highPlain},
+      low: {show:true, label:'美盤回調低點分析', text:ANALYSIS_TEXT.lowPullback},
+      rise: {show:true, text:ANALYSIS_TEXT.rise},
+      fallStart: {show:false},
+      smallFall: {show:true, text:ANALYSIS_TEXT.smallFall},
+      smallRise: {show:false}
+    };
+  }
+  if(pType === 'UH'){
+    return {
+      high: {show:true, label:'美盤回調高點分析', text:ANALYSIS_TEXT.highPullback},
+      low: {show:true, label:'突破口低點分析', text:ANALYSIS_TEXT.lowPlain},
+      rise: {show:false},
+      fallStart: {show:true, text:ANALYSIS_TEXT.fallStart},
+      smallFall: {show:false},
+      smallRise: {show:true, text:ANALYSIS_TEXT.smallRise}
+    };
+  }
+  const isUp = s.b1Direction !== '下跌';
+  return {
+    high: {show:true, label:'突破口高點分析', text:ANALYSIS_TEXT.highPlain},
+    low: {show:true, label:'突破口低點分析', text:ANALYSIS_TEXT.lowPlain},
+    rise: {show:isUp, text:ANALYSIS_TEXT.rise},
+    fallStart: {show:!isUp, text:ANALYSIS_TEXT.fallStart},
+    smallFall: {show:false},
+    smallRise: {show:false}
+  };
+}
+
+function applyFieldRow(rowId, textareaId, fieldCfg){
+  const row = $(rowId);
+  if(!fieldCfg || !fieldCfg.show){ row.style.display = 'none'; return; }
+  row.style.display = '';
+  $(textareaId).placeholder = fieldCfg.text || '';
+}
+
+function updateAnalysisFieldsVisibility(){
+  const s = getStratFields();
+  const cfg = getModuleFieldConfig(pullbackType, s);
+  $('lbl-highAnalysis').textContent = cfg.high.label;
+  applyFieldRow('row-highAnalysis', 'strat-highAnalysis', cfg.high);
+  $('lbl-lowAnalysis').textContent = cfg.low.label;
+  applyFieldRow('row-lowAnalysis', 'strat-lowAnalysis', cfg.low);
+  applyFieldRow('row-riseAnalysis', 'strat-riseAnalysis', cfg.rise);
+  applyFieldRow('row-fallStartAnalysis', 'strat-fallStartAnalysis', cfg.fallStart);
+  applyFieldRow('row-fallAnalysis', 'strat-fallAnalysis', cfg.smallFall);
+  applyFieldRow('row-smallRiseAnalysis', 'strat-smallRiseAnalysis', cfg.smallRise);
 }
 
 function applyDraft(date){
@@ -787,9 +885,11 @@ function applyDraft(date){
   $('in-pullback').value = d.pullbackVal || '';
   if(pullbackType === 'none'){
     $('pullback-value-row').style.display = 'none';
+    $('b1-direction-row').style.display = 'block';
   } else {
     $('pullback-value-row').style.display = 'grid';
     $('pullback-value-label').textContent = pullbackType==='UL' ? '回調低點 UL 數值' : '回調高點 UH 數值';
+    $('b1-direction-row').style.display = 'none';
   }
   setStratFields(d.strat || {});
 }
@@ -810,9 +910,11 @@ function getStratFields(){
     d1: getPillVal('d1'), h4: getPillVal('h4'), h1: getPillVal('h1'),
     nearBreak: getPillVal('nearBreak'),
     specialType: getPillVal('specialType'), specialNote: $('strat-specialNote').value,
+    specialSubType: getPillVal('specialSubType'), b1Direction: getPillVal('b1Direction'),
     module: $('strat-module').value, phrase: $('strat-phrase').value,
     highAnalysis: $('strat-highAnalysis').value, lowAnalysis: $('strat-lowAnalysis').value,
-    riseAnalysis: $('strat-riseAnalysis').value, fallAnalysis: $('strat-fallAnalysis').value,
+    riseAnalysis: $('strat-riseAnalysis').value, fallStartAnalysis: $('strat-fallStartAnalysis').value,
+    fallAnalysis: $('strat-fallAnalysis').value, smallRiseAnalysis: $('strat-smallRiseAnalysis').value,
     upReversal: $('strat-upReversal').value, downReversal: $('strat-downReversal').value
   };
 }
@@ -827,13 +929,19 @@ function buildStratSection(mode, s){
   if(s.module) lines.push(`▫ 策略模組：${s.module}`);
   if(s.phrase) lines.push(`▫ 策略語句：${s.phrase}`);
 
+  const cfg = getModuleFieldConfig(pullbackType, s);
   const detailPairs = [
-    ['突破口高點分析', s.highAnalysis], ['突破口低點分析', s.lowAnalysis],
-    ['起漲點分析', s.riseAnalysis], ['小起跌點分析', s.fallAnalysis],
-    ['上漲行情反轉', s.upReversal], ['下跌行情反轉', s.downReversal]
+    [cfg.high.label, s.highAnalysis, cfg.high.show],
+    [cfg.low.label, s.lowAnalysis, cfg.low.show],
+    ['起漲點分析', s.riseAnalysis, cfg.rise.show],
+    ['起跌點分析', s.fallStartAnalysis, cfg.fallStart.show],
+    ['小起跌點分析', s.fallAnalysis, cfg.smallFall.show],
+    ['小起漲點分析', s.smallRiseAnalysis, cfg.smallRise.show],
+    ['上漲行情反轉', s.upReversal, true],
+    ['下跌行情反轉', s.downReversal, true]
   ];
-  detailPairs.forEach(([label, val])=>{
-    if(val && val.trim()) lines.push(`▫ ${label}：${val.trim()}`);
+  detailPairs.forEach(([label, val, show])=>{
+    if(show && val && val.trim()) lines.push(`▫ ${label}：${val.trim()}`);
   });
 
   if(mode === 'compact') return lines.join('\n');
@@ -853,12 +961,13 @@ document.querySelectorAll('.pill-row[data-strat]').forEach(row=>{
       if(row.dataset.strat === 'specialType'){
         $('special-note-row').style.display = p.dataset.v === '有' ? 'grid' : 'none';
       }
+      updateAnalysisFieldsVisibility();
       updateReport();
       saveDraftNow();
     });
   });
 });
-['strat-specialNote','strat-module','strat-phrase','strat-highAnalysis','strat-lowAnalysis','strat-riseAnalysis','strat-fallAnalysis','strat-upReversal','strat-downReversal'].forEach(id=>{
+['strat-specialNote','strat-module','strat-phrase','strat-highAnalysis','strat-lowAnalysis','strat-riseAnalysis','strat-fallStartAnalysis','strat-fallAnalysis','strat-smallRiseAnalysis','strat-upReversal','strat-downReversal'].forEach(id=>{
   $(id).addEventListener('input', ()=>{ updateReport(); saveDraftNow(); });
 });
 
@@ -876,10 +985,14 @@ $('pullback-type').querySelectorAll('.pill').forEach(p=>{
     pullbackType = p.dataset.type;
     if(pullbackType === 'none'){
       $('pullback-value-row').style.display = 'none';
+      $('b1-direction-row').style.display = 'block';
     } else {
       $('pullback-value-row').style.display = 'grid';
       $('pullback-value-label').textContent = pullbackType==='UL' ? '回調低點 UL 數值' : '回調高點 UH 數值';
+      $('b1-direction-row').style.display = 'none';
     }
+    updateAnalysisFieldsVisibility();
+    updateReport();
     saveDraftNow();
   });
 });
