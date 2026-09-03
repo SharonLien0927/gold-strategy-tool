@@ -21,8 +21,13 @@
     --green:#5FAE82; --red:#D9614F; --amber:#E0A83E;
   }
   *{box-sizing:border-box; -webkit-tap-highlight-color:transparent;}
-  body{margin:0; background:var(--bg); color:var(--text); font-family:'Inter',sans-serif; padding:20px 14px 60px; min-height:100vh;}
+  body{margin:0; background:var(--bg); color:var(--text); font-family:'Inter',sans-serif; padding:20px 14px 80px; min-height:100vh;}
   .wrap{max-width:520px; margin:0 auto;}
+
+  .bottom-tabs{position:fixed; left:0; right:0; bottom:0; display:flex; background:var(--surface); border-top:1px solid var(--border); z-index:50; padding-bottom:env(safe-area-inset-bottom);}
+  .tab-btn{flex:1; padding:14px 8px; background:transparent; border:none; color:var(--text-dim); font-family:'Space Grotesk',sans-serif; font-weight:600; font-size:13px; cursor:pointer;}
+  .tab-btn.active{color:var(--gold-bright);}
+  .hist-textarea{width:100%; font-family:'JetBrains Mono',monospace; font-size:12px; line-height:1.6; white-space:pre-wrap; background:var(--surface-2); border:1px solid var(--border); border-radius:8px; padding:10px; color:var(--text); resize:vertical;}
   header{margin-bottom:22px;}
   .eyebrow{font-family:'JetBrains Mono',monospace; font-size:11px; letter-spacing:2px; color:var(--gold); text-transform:uppercase; margin-bottom:6px;}
   h1{font-family:'Space Grotesk',sans-serif; font-size:26px; font-weight:700; margin:0 0 4px;}
@@ -129,6 +134,7 @@
 <body>
 <div class="wrap">
 
+<div id="view-daily">
   <header>
     <div class="eyebrow">GOLD · DAILY STRATEGY ENGINE</div>
     <h1>每日策略</h1>
@@ -225,6 +231,7 @@
       <div class="stat-grid">
         <div class="stat"><div class="k">CR 收盤位置比</div><div class="v" id="s-cr">—</div></div>
         <div class="stat"><div class="k" id="lbl-hpc">H − PC</div><div class="v" id="s-hpc">—</div></div>
+        <div class="stat"><div class="k" id="lbl-pcl">PC − L</div><div class="v" id="s-pcl">—</div></div>
       </div>
       <div class="stat-grid" id="pullback-stats" style="margin-top:10px; display:none;">
         <div class="stat"><div class="k" id="lbl-stat1">H − UL</div><div class="v" id="s-stat1">—</div></div>
@@ -234,8 +241,7 @@
 
     <div class="card" id="card-distance" style="display:none;">
       <div class="section-title">📊 距離判斷</div>
-      <div class="stat-grid">
-        <div class="stat"><div class="k" id="lbl-pct1">距離 ÷ 單日波幅</div><div class="v" id="s-pct1">—</div></div>
+      <div class="stat-grid" style="grid-template-columns:1fr;">
         <div class="stat"><div class="k" id="lbl-pct2">距離 ÷ 5日均幅</div><div class="v" id="s-pct2">—</div></div>
       </div>
     </div>
@@ -254,19 +260,6 @@
 
     <div class="card">
       <div class="section-title">🧭 策略解析（主觀判斷填寫）</div>
-
-      <label style="display:block; margin-bottom:8px;">趨勢 D1</label>
-      <div class="pill-row" data-strat="d1">
-        <div class="pill" data-v="上漲">上漲</div><div class="pill active" data-v="震盪">震盪</div><div class="pill" data-v="下跌">下跌</div>
-      </div>
-      <label style="display:block; margin-bottom:8px;">趨勢 H4</label>
-      <div class="pill-row" data-strat="h4">
-        <div class="pill" data-v="上漲">上漲</div><div class="pill active" data-v="震盪">震盪</div><div class="pill" data-v="下跌">下跌</div>
-      </div>
-      <label style="display:block; margin-bottom:8px;">趨勢 H1</label>
-      <div class="pill-row" data-strat="h1">
-        <div class="pill" data-v="上漲">上漲</div><div class="pill active" data-v="震盪">震盪</div><div class="pill" data-v="下跌">下跌</div>
-      </div>
 
       <label style="display:block; margin-bottom:8px;">關盤價是否接近突破口</label>
       <div class="pill-row" data-strat="nearBreak">
@@ -334,11 +327,43 @@
       </div>
       <div id="report"></div>
       <button class="btn btn-ghost" id="btn-copy">📋 複製文字</button>
-      <button class="btn btn-ghost" id="btn-download-history">📥 下載策略紀錄（全部天數）</button>
     </div>
   </div>
 
   <div class="empty-hint" id="empty-hint">請先更新五日紀錄，並點選今日日期，再計算報表</div>
+</div>
+
+<div id="view-history" style="display:none;">
+  <header>
+    <div class="eyebrow">GOLD · DAILY STRATEGY ENGINE</div>
+    <h1>歷史紀錄</h1>
+    <div class="subtitle">瀏覽、編輯、下載每日策略報表</div>
+  </header>
+
+  <div class="card card-accent">
+    <div class="section-title">🔍 篩選</div>
+    <div class="field-row">
+      <div class="field"><label>從</label><input type="date" id="hist-from"></div>
+      <div class="field"><label>到</label><input type="date" id="hist-to"></div>
+    </div>
+    <div class="field full" style="margin-bottom:10px;">
+      <label>快速選擇月份</label>
+      <select id="hist-month"><option value="">全部</option></select>
+    </div>
+    <div style="display:flex; gap:8px;">
+      <button class="btn btn-ghost" id="btn-hist-clear" style="margin-top:0; flex:1;">清除篩選</button>
+      <button class="btn btn-secondary" id="btn-hist-download" style="margin-bottom:0; flex:1;">📥 下載</button>
+    </div>
+  </div>
+
+  <div id="history-list"></div>
+  <div class="empty-hint" id="history-empty" style="display:none;">尚無符合條件的紀錄</div>
+</div>
+</div><!-- /wrap -->
+
+<div class="bottom-tabs">
+  <button class="tab-btn active" data-view="daily">📅 每日策略</button>
+  <button class="tab-btn" data-view="history">📜 歷史紀錄</button>
 </div>
 
 <div class="toast" id="toast"></div>
@@ -380,29 +405,52 @@ let cloudOk = false;
 
 const LOCAL_KEY = 'gold-strategy-data';
 const DEFAULT_STRAT = {
-  d1:'震盪', h4:'震盪', h1:'震盪', nearBreak:'無', specialType:'無', specialNote:'',
+  nearBreak:'無', specialType:'無', specialNote:'',
   specialSubType:'V型震盪', b1Direction:'上漲',
   module:'', phrase:'', highAnalysis:'', lowAnalysis:'', riseAnalysis:'', fallStartAnalysis:'',
   fallAnalysis:'', smallRiseAnalysis:'', upReversal:'', downReversal:''
 };
 
-const ANALYSIS_TEXT = {
-  highPlain: '突破口高點下方領域內沒有適合損益比分析線可參考收盤，無法規劃兩個條件空單策略。⚠️ 若亞盤上探不破突破口高點，有機會看跌，激進空單止損可設於「突破口高點+1」美金【SL=】。',
-  lowPlain: '突破口低點上方領域內沒有適合損益比分析線可參考收盤，無法規劃兩個條件多單策略。⚠️ 若亞盤下探不破突破口低點，有機會看漲，激進多單止損可設於「突破口低點-0.5」美金【SL=】。',
-  lowPullback: '美盤回調低點上方領域內沒有適合損益比分析線可參考收盤，無法規劃兩個條件多單策略。⚠️ 若亞盤下跌至突破口低點守住不破，有機會看漲，激進多單止損可設於「突破口低點-0.5」美金【SL=】。',
-  highPullback: '美盤回調高點下方領域內沒有適合損益比分析線可參考收盤，無法規劃兩個條件空單策略。⚠️ 若亞盤上漲至突破口高點守住不破，有機會看跌，激進空單止損可設於「突破口高點+1」美金【SL=】。',
-  rise: '若亞盤上漲破突破口高點，可標注日內低點為〔起漲點〕。⚠️ 若行情回落不破〔起漲點〕，有機會看漲，投機多單止損可設於「〔起漲點〕-0.5美金」。',
-  fallStart: '若亞盤下跌破突破口低點，可標注日內高點為〔起跌點〕。⚠️ 若行情回升不破〔起跌點〕，有機會看跌，投機空單止損可設於「〔起跌點〕+1美金」。',
-  smallFall: '若亞盤下跌破回調低點，可標注日內高點為〔小起跌點〕。⚠️ 若行情回調不破〔小起跌點〕，有機會看跌，投機空單止損可設於「〔小起跌點〕+1美金」。（若開盤下跳突破位回調低點，不參考小起跌點）',
-  smallRise: '若亞盤上漲破回調高點，可標注日內低點為〔小起漲點〕。⚠️ 若行情回調不破〔小起漲點〕，有機會看漲，投機多單止損可設於「〔小起漲點〕-0.5美金」。（若開盤上跳突破位回調高點，不參考小起漲點）'
-};
+function computeAnalysisTemplates(){
+  const H = parseFloat($('in-H').value);
+  const L = parseFloat($('in-L').value);
+  const pv = parseFloat($('in-pullback').value);
+  const hasHL = isFinite(H) && isFinite(L);
+  const hasPullback = isFinite(pv);
+  const T = {};
+  if(!hasHL) return T;
+
+  T.highPlain = `突破口高點${fmt(H)}下方領域內沒有適合損益比分析線可參考收盤，無法規劃兩個條件空單策略。⚠️ 若亞盤上探不破突破口高點${fmt(H)}，有機會看跌，激進空單止損可設於「${fmt(H+1)}」美金【SL=】。`;
+  T.lowPlain = `突破口低點${fmt(L)}上方領域內沒有適合損益比分析線可參考收盤，無法規劃兩個條件多單策略。⚠️ 若亞盤下探不破突破口低點${fmt(L)}，有機會看漲，激進多單止損可設於「${fmt(L-0.5)}」美金【SL=】。`;
+  T.rise = `若亞盤上漲破突破口高點${fmt(H)}，可標注日內低點為〔起漲點〕。⚠️ 若行情回落不破〔起漲點〕，有機會看漲，投機多單止損可設於「〔起漲點〕-0.5美金」。`;
+  T.fallStart = `若亞盤下跌破突破口低點${fmt(L)}，可標注日內高點為〔起跌點〕。⚠️ 若行情回升不破〔起跌點〕，有機會看跌，投機空單止損可設於「〔起跌點〕+1美金」。`;
+
+  if(hasPullback){
+    T.lowPullback = `美盤回調低點${fmt(pv)}上方領域內沒有適合損益比分析線可參考收盤，無法規劃兩個條件多單策略。⚠️ 若亞盤下跌至突破口低點${fmt(L)}守住不破，有機會看漲，激進多單止損可設於「${fmt(L-0.5)}」美金【SL=】。`;
+    T.highPullback = `美盤回調高點${fmt(pv)}下方領域內沒有適合損益比分析線可參考收盤，無法規劃兩個條件空單策略。⚠️ 若亞盤上漲至突破口高點${fmt(H)}守住不破，有機會看跌，激進空單止損可設於「${fmt(H+1)}」美金【SL=】。`;
+    T.smallFall = `若亞盤下跌破回調低點${fmt(pv)}，可標注日內高點為〔小起跌點〕。⚠️ 若行情回調不破〔小起跌點〕，有機會看跌，投機空單止損可設於「〔小起跌點〕+1美金」。（若開盤下跳突破位回調低點${fmt(pv)}，不參考小起跌點）`;
+    T.smallRise = `若亞盤上漲破回調高點${fmt(pv)}，可標注日內低點為〔小起漲點〕。⚠️ 若行情回調不破〔小起漲點〕，有機會看漲，投機多單止損可設於「〔小起漲點〕-0.5美金」。（若開盤上跳突破位回調高點${fmt(pv)}，不參考小起漲點）`;
+  }
+
+  const highTrigger = pullbackType === 'UH' && hasPullback ? `突破口高點${fmt(H)}/美盤回調高點${fmt(pv)}` : `突破口高點${fmt(H)}`;
+  const lowTrigger = pullbackType === 'UL' && hasPullback ? `回調低點${fmt(pv)}/突破口低點${fmt(L)}` : `突破口低點${fmt(L)}`;
+  T.upReversal = `若日內走一段上漲行情（需破${highTrigger}），可待上漲日內最高點出【轉空訊號】，且收下關鍵分析線（【】/【】/【】/...）可評估空單，止損可設轉空訊號高點上方+1美金（實際SL設為「轉空訊號高點+1」美金）。⚠️ 注意若實際損益比不佳可取消進場。`;
+  T.downReversal = `若日內走一段下跌行情（需破${lowTrigger}），可待下跌日內最低點出現【轉多訊號】，且收上關鍵分析線（【】/【】/...）可評估多單，止損可設轉多訊號低點下方-0.5美金（實際SL設為「轉多訊號低點-0.5」美金）。⚠️ 注意若實際損益比不佳可取消進場。`;
+
+  return T;
+}
 
 function debounce(fn, ms){
   let t;
   return (...args) => { clearTimeout(t); t = setTimeout(()=>fn(...args), ms); };
 }
 
-function isoDate(d){ return d.toISOString().slice(0,10); }
+function isoDate(d){
+  const y = d.getFullYear();
+  const m = String(d.getMonth()+1).padStart(2,'0');
+  const day = String(d.getDate()).padStart(2,'0');
+  return `${y}-${m}-${day}`;
+}
 
 function withTimeout(promise, ms){
   return Promise.race([
@@ -451,6 +499,7 @@ async function syncFromCloud(){
   renderFiveDayTable();
   $('avg5-readout').textContent = fmt(get5Avg());
   refreshDateUI();
+  if($('view-history').style.display !== 'none') renderHistoryList();
 }
 
 async function persistCloud(payload){
@@ -479,18 +528,96 @@ async function persistAll(){
 
 const persistCloudDebounced = debounce(()=>{ persistCloud(saveLocalOnly()); }, 700);
 
+function filteredHistoryDates(){
+  const from = $('hist-from').value;
+  const to = $('hist-to').value;
+  return Object.keys(reportHistory).filter(d=>{
+    if(from && d < from) return false;
+    if(to && d > to) return false;
+    return true;
+  }).sort();
+}
+
 function downloadReportHistory(){
-  const dates = Object.keys(reportHistory).sort();
-  if(!dates.length){ showToast('尚無策略紀錄可下載', true); return; }
+  const dates = filteredHistoryDates();
+  if(!dates.length){ showToast('沒有符合篩選條件的紀錄', true); return; }
   const text = dates.map(d => reportHistory[d]).join('\n\n' + '='.repeat(40) + '\n\n');
   const blob = new Blob([text], {type: 'text/plain;charset=utf-8'});
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
-  a.href = url; a.download = 'gold-strategy-history.txt';
+  const from = $('hist-from').value, to = $('hist-to').value;
+  const suffix = (from || to) ? `_${from||'start'}_${to||'end'}` : '_全部';
+  a.href = url; a.download = `gold-strategy-history${suffix}.txt`;
   document.body.appendChild(a); a.click(); document.body.removeChild(a);
   URL.revokeObjectURL(url);
-  showToast('已下載策略紀錄 ✓');
+  showToast('已下載紀錄 ✓');
 }
+
+function populateHistoryMonthSelect(){
+  const sel = $('hist-month');
+  const months = Array.from(new Set(Object.keys(reportHistory).map(d=>d.slice(0,7)))).sort().reverse();
+  const current = sel.value;
+  sel.innerHTML = '<option value="">全部</option>' + months.map(m=>{
+    const [y, mo] = m.split('-');
+    return `<option value="${m}">${y}年${parseInt(mo,10)}月</option>`;
+  }).join('');
+  sel.value = months.includes(current) ? current : '';
+}
+
+function renderHistoryList(){
+  populateHistoryMonthSelect();
+  const dates = filteredHistoryDates().reverse(); // 最新的在最上面
+  const list = $('history-list');
+  list.innerHTML = '';
+  $('history-empty').style.display = dates.length ? 'none' : 'block';
+
+  dates.forEach(date=>{
+    const card = document.createElement('div');
+    card.className = 'card';
+    card.innerHTML = `
+      <div class="section-title">📆 ${date}</div>
+      <textarea class="hist-textarea" rows="8"></textarea>
+      <button class="btn btn-ghost hist-save-btn" style="margin-top:8px;">💾 儲存修改</button>
+    `;
+    card.querySelector('.hist-textarea').value = reportHistory[date];
+    card.querySelector('.hist-save-btn').addEventListener('click', async ()=>{
+      reportHistory[date] = card.querySelector('.hist-textarea').value;
+      await persistAll();
+      showToast(`已更新 ${date} 的紀錄 ✓`);
+    });
+    list.appendChild(card);
+  });
+}
+
+function switchView(view){
+  $('view-daily').style.display = view === 'daily' ? '' : 'none';
+  $('view-history').style.display = view === 'history' ? '' : 'none';
+  document.querySelectorAll('.tab-btn').forEach(b=>b.classList.toggle('active', b.dataset.view === view));
+  if(view === 'history') renderHistoryList();
+}
+
+document.querySelectorAll('.tab-btn').forEach(b=>{
+  b.addEventListener('click', ()=>switchView(b.dataset.view));
+});
+
+$('hist-from').addEventListener('input', renderHistoryList);
+$('hist-to').addEventListener('input', renderHistoryList);
+$('hist-month').addEventListener('change', ()=>{
+  const m = $('hist-month').value;
+  if(m){
+    const [y, mo] = m.split('-').map(Number);
+    $('hist-from').value = isoDate(new Date(y, mo-1, 1));
+    $('hist-to').value = isoDate(new Date(y, mo, 0));
+  }
+  renderHistoryList();
+});
+$('btn-hist-clear').addEventListener('click', ()=>{
+  $('hist-from').value = '';
+  $('hist-to').value = '';
+  $('hist-month').value = '';
+  renderHistoryList();
+});
+$('btn-hist-download').addEventListener('click', downloadReportHistory);
 
 function showToast(msg, isErr){
   const t = $('toast'); t.textContent = msg;
@@ -586,6 +713,7 @@ async function saveFiveDay(){
   const avg5 = get5Avg();
   $('avg5-readout').textContent = fmt(avg5);
   renderFiveDayTable();
+  updateAnalysisFieldsVisibility();
   showToast('五日紀錄已更新 ✓');
 }
 
@@ -595,12 +723,17 @@ function get5Avg(){
   return last5.reduce((s,e)=>s+(e.high-e.low),0)/last5.length;
 }
 
-function drawLadder(L, pullbackVal, PC, H, type, cost){
+function drawLadder(L, pullbackVal, PC, H, type, cost, downgraded){
   const pts = [{v:L,label:'L',color:'var(--red)'},{v:PC,label:'PC',color:'var(--gold-bright)'},{v:H,label:'H',color:'var(--green)'}];
   if(type !== 'none') pts.push({v:pullbackVal, label:type, color:'var(--amber)'});
 
-  const bandHBottom = H - cost, bandHTop = H;
-  const bandLBottom = L, bandLTop = L + cost;
+  // 有回調點且距離達標時，成本區塊改用「H↔回調點」/「回調點↔L」；未達標（降級）或無回調點則用 H↔L
+  const useUL = type === 'UL' && !downgraded;
+  const useUH = type === 'UH' && !downgraded;
+  const bandHBottom = useUH ? pullbackVal - cost : H - cost;
+  const bandHTop = useUH ? pullbackVal : H;
+  const bandLBottom = useUL ? pullbackVal : L;
+  const bandLTop = useUL ? pullbackVal + cost : L + cost;
   const pcInCostZone = (PC <= bandHTop && PC >= bandHBottom) || (PC >= bandLBottom && PC <= bandLTop);
 
   const boundaryVals = [...pts.map(p=>p.v), bandHBottom, bandHTop, bandLBottom, bandLTop];
@@ -634,6 +767,7 @@ function drawLadder(L, pullbackVal, PC, H, type, cost){
     ? '⚠ 關盤價落在成本領域內（紅色區塊：突破口往內 5Avg×10%）'
     : '紅色區塊：突破口往內 5Avg×10% 的成本領域';
   caption.classList.toggle('warn', pcInCostZone);
+  return pcInCostZone;
 }
 
 function renderJudge(R, threshold){
@@ -675,18 +809,22 @@ function buildReport(mode, d){
     `▫ 突破口高點【${fmt(d.H)}】／突破口低點【${fmt(d.L)}】`,
   ];
   if(d.type !== 'none'){
-    lines.push(`▫ ${d.type==='UL' ? '美盤回調低點' : '美盤回調高點'}【${fmt(d.pullbackVal)}】`);
-    lines.push(`▫ 關盤價【${fmt(d.PC)}】(CR=${fmt(d.CR,2)})(${d.stat1Label}=${fmt(d.stat1)}；H-PC=${fmt(d.H_PC)}；${d.stat2Label}=${fmt(d.stat2)})`);
+    lines.push(`▫ ${d.type==='UL' ? '美盤回調低點' : '美盤回調高點'}【${fmt(d.pullbackVal)}】${d.below30?'（未達30%❌不參考）':''}`);
+    lines.push(`▫ 關盤價【${fmt(d.PC)}】(CR=${fmt(d.CR,2)})(${d.stat1Label}=${fmt(d.stat1)}；H-PC=${fmt(d.H_PC)}；PC-L=${fmt(d.PC_L)}；${d.stat2Label}=${fmt(d.stat2)})`);
     lines.push(``);
-    lines.push(`▫ ${d.stat1Label}距離：${fmt(d.stat1)}美金；佔單日波幅 ${fmtPct(d.pctOfDaily)}${d.exceed30?'（超過30%）':''}；佔5日均幅 ${fmtPct(d.pctOfAvg5)}${d.exceed40?'（超過40%）':''}`);
+    lines.push(`▫ ${d.stat1Label}距離：${fmt(d.stat1)}美金；佔5日均幅 ${fmtPct(d.pctOfAvg5)}${d.exceed40?'（超過40%）':''}${d.below30?'（未達30% ⚠️）':''}`);
   } else {
-    lines.push(`▫ 關盤價【${fmt(d.PC)}】(CR=${fmt(d.CR,2)})(H-PC=${fmt(d.H_PC)})`);
+    lines.push(`▫ 關盤價【${fmt(d.PC)}】(CR=${fmt(d.CR,2)})(H-PC=${fmt(d.H_PC)}；PC-L=${fmt(d.PC_L)})`);
     lines.push(``);
     lines.push(`▫ 今日無回調點，距離判斷不適用`);
   }
   lines.push(``);
-  lines.push(`▫ 多空區間距離：${fmt(d.range)}U${d.type==='none' ? '（無回調點，以 H-L 代替）':''} — 雙成本領域：${fmt(d.doubleCost)}U`);
+  lines.push(`▫ 多空區間距離：${fmt(d.range)}U${(d.type==='none' || d.downgraded) ? '（'+(d.downgraded?'回調點未達30%不參考，':'無回調點，')+'以 H-L 代替）':''} — 雙成本領域：${fmt(d.doubleCost)}U`);
   lines.push(`▫ 損益比 R = ${fmt(d.R,2)}R → 利潤空間：${d.judgeLabel}（門檻 R≥${d.threshold}）`);
+  if(d.pcInCostZone){
+    lines.push(``);
+    lines.push(`▫ ⚠️ 關盤價落在成本領域內：若開盤有先回調10%5日波幅，再破突破口或美盤回調點，可參考後續的大/小起漲、大/小起跌點`);
+  }
   lines.push(``);
   lines.push(buildStratSection('full', getStratFields()));
   return lines.join('\n');
@@ -716,26 +854,26 @@ async function calculate(){
   const wick = avg5 * 0.03;
   const CR = (PC-L)/(H-L);
   const H_PC = H-PC;
+  const PC_L = PC-L;
 
-  let range, stat1=NaN, stat2=NaN, stat1Label='', stat2Label='', pctOfDaily=NaN, pctOfAvg5=NaN, exceed30=false, exceed40=false;
+  let stat1=NaN, stat2=NaN, stat1Label='', stat2Label='', pctOfAvg5=NaN, exceed40=false, below30=false;
 
   if(pullbackType === 'UL'){
     stat1 = H - pullbackVal; stat2 = PC - pullbackVal;
     stat1Label = 'H-UL'; stat2Label = 'PC-UL';
-    range = stat1;
   } else if(pullbackType === 'UH'){
     stat1 = pullbackVal - L; stat2 = pullbackVal - PC;
     stat1Label = 'UH-L'; stat2Label = 'UH-PC';
-    range = stat1;
-  } else {
-    range = H - L;
   }
 
   if(pullbackType !== 'none'){
-    pctOfDaily = stat1/dailyVol*100;
     pctOfAvg5 = stat1/avg5*100;
-    exceed30 = pctOfDaily>30; exceed40 = pctOfAvg5>40;
+    exceed40 = pctOfAvg5>40; below30 = pctOfAvg5<30;
   }
+
+  // 回調點距離不到5日均幅30%時視為不參考，退回用 H-L 當作範圍（跟策略分析欄位的B1降級規則一致）
+  const downgraded = pullbackType !== 'none' && below30;
+  const range = (pullbackType === 'none' || downgraded) ? (H - L) : stat1;
 
   const doubleCost = cost*2;
   const R = (range - doubleCost)/cost;
@@ -743,6 +881,8 @@ async function calculate(){
 
   $('lbl-hpc').textContent = 'H − PC';
   $('s-hpc').textContent = fmt(H_PC);
+  $('lbl-pcl').textContent = 'PC − L';
+  $('s-pcl').textContent = fmt(PC_L);
 
   if(pullbackType !== 'none'){
     $('pullback-stats').style.display = 'grid';
@@ -751,16 +891,15 @@ async function calculate(){
     $('s-stat1').textContent = fmt(stat1);
     $('s-stat2').textContent = fmt(stat2);
     $('card-distance').style.display = 'block';
-    $('lbl-pct1').textContent = `${stat1Label} ÷ 單日波幅`;
     $('lbl-pct2').textContent = `${stat1Label} ÷ 5日均幅`;
-    $('s-pct1').textContent = fmtPct(pctOfDaily)+(exceed30?' ⚠️':'');
     $('s-pct2').textContent = fmtPct(pctOfAvg5)+(exceed40?' ⚠️':'');
+    $('s-pct2').style.color = below30 ? 'var(--red)' : '';
   } else {
     $('pullback-stats').style.display = 'none';
     $('card-distance').style.display = 'none';
   }
 
-  $('range-label').textContent = pullbackType==='none' ? '多空區間距離（H-L代替）' : '多空區間距離';
+  $('range-label').textContent = (pullbackType==='none' || downgraded) ? '多空區間距離（H-L代替）' : '多空區間距離';
   $('s-dailyvol').textContent = fmt(dailyVol);
   $('s-avg5').textContent = fmt(avg5);
   $('s-cost').textContent = fmt(cost);
@@ -769,10 +908,10 @@ async function calculate(){
   $('s-range').textContent = fmt(range)+'U';
   $('s-doublecost').textContent = fmt(doubleCost)+'U';
 
-  drawLadder(L, pullbackVal, PC, H, pullbackType, cost);
+  const pcInCostZone = drawLadder(L, pullbackVal, PC, H, pullbackType, cost, downgraded);
 
-  const d = {date, dailyVol, avg5, cost, wick, H, L, PC, CR, H_PC, type:pullbackType, pullbackVal,
-    stat1, stat2, stat1Label, stat2Label, pctOfDaily, pctOfAvg5, exceed30, exceed40, range, doubleCost, R, judgeLabel, threshold};
+  const d = {date, dailyVol, avg5, cost, wick, H, L, PC, CR, H_PC, PC_L, type:pullbackType, pullbackVal,
+    stat1, stat2, stat1Label, stat2Label, pctOfAvg5, exceed40, below30, downgraded, pcInCostZone, range, doubleCost, R, judgeLabel, threshold};
   lastCalc = d;
   $('report').textContent = buildReport(reportMode, d);
   reportHistory[date] = buildReport('full', d);
@@ -794,7 +933,7 @@ function captureDraft(){
 
 function setStratFields(s){
   const vals = Object.assign({}, DEFAULT_STRAT, s);
-  ['d1','h4','h1','nearBreak','specialType','specialSubType','b1Direction'].forEach(name=>{
+  ['nearBreak','specialType','specialSubType','b1Direction'].forEach(name=>{
     const row = document.querySelector(`.pill-row[data-strat="${name}"]`);
     row.querySelectorAll('.pill').forEach(p=>p.classList.toggle('active', p.dataset.v === vals[name]));
   });
@@ -813,67 +952,98 @@ function setStratFields(s){
   updateAnalysisFieldsVisibility();
 }
 
-function getModuleFieldConfig(pType, s){
-  const isVShape = s.specialType === '有' && s.specialSubType === 'V型震盪';
-  if(isVShape){
-    return {
-      high: {show:true, label:'突破口高點分析', text:ANALYSIS_TEXT.highPlain},
-      low: {show:true, label:'突破口低點分析', text:ANALYSIS_TEXT.lowPlain},
-      rise: {show:true, text:ANALYSIS_TEXT.rise},
-      fallStart: {show:true, text:ANALYSIS_TEXT.fallStart},
-      smallFall: {show:false},
-      smallRise: {show:false}
-    };
-  }
-  if(pType === 'UL'){
-    return {
-      high: {show:true, label:'突破口高點分析', text:ANALYSIS_TEXT.highPlain},
-      low: {show:true, label:'美盤回調低點分析', text:ANALYSIS_TEXT.lowPullback},
-      rise: {show:true, text:ANALYSIS_TEXT.rise},
-      fallStart: {show:false},
-      smallFall: {show:true, text:ANALYSIS_TEXT.smallFall},
-      smallRise: {show:false}
-    };
-  }
-  if(pType === 'UH'){
-    return {
-      high: {show:true, label:'美盤回調高點分析', text:ANALYSIS_TEXT.highPullback},
-      low: {show:true, label:'突破口低點分析', text:ANALYSIS_TEXT.lowPlain},
-      rise: {show:false},
-      fallStart: {show:true, text:ANALYSIS_TEXT.fallStart},
-      smallFall: {show:false},
-      smallRise: {show:true, text:ANALYSIS_TEXT.smallRise}
-    };
-  }
-  const isUp = s.b1Direction !== '下跌';
+function computeStat1PctOfAvg5(){
+  const H = parseFloat($('in-H').value);
+  const L = parseFloat($('in-L').value);
+  const pv = parseFloat($('in-pullback').value);
+  const avg5 = get5Avg();
+  if(![H,L,pv,avg5].every(isFinite) || avg5 === 0) return NaN;
+  const stat1 = pullbackType === 'UL' ? H - pv : (pullbackType === 'UH' ? pv - L : NaN);
+  return isFinite(stat1) ? stat1/avg5*100 : NaN;
+}
+
+function b1FieldConfig(isUp){
   return {
-    high: {show:true, label:'突破口高點分析', text:ANALYSIS_TEXT.highPlain},
-    low: {show:true, label:'突破口低點分析', text:ANALYSIS_TEXT.lowPlain},
-    rise: {show:isUp, text:ANALYSIS_TEXT.rise},
-    fallStart: {show:!isUp, text:ANALYSIS_TEXT.fallStart},
+    high: {show:true, label:'突破口高點分析', key:'highPlain'},
+    low: {show:true, label:'突破口低點分析', key:'lowPlain'},
+    rise: {show:isUp, key:'rise'},
+    fallStart: {show:!isUp, key:'fallStart'},
     smallFall: {show:false},
     smallRise: {show:false}
   };
 }
 
-function applyFieldRow(rowId, textareaId, fieldCfg){
+function getModuleFieldConfig(pType, s){
+  const isVShape = s.specialType === '有' && s.specialSubType === 'V型震盪';
+  if(isVShape){
+    return {
+      high: {show:true, label:'突破口高點分析', key:'highPlain'},
+      low: {show:true, label:'突破口低點分析', key:'lowPlain'},
+      rise: {show:true, key:'rise'},
+      fallStart: {show:true, key:'fallStart'},
+      smallFall: {show:false},
+      smallRise: {show:false}
+    };
+  }
+  const pct = computeStat1PctOfAvg5();
+  const belowThreshold = isFinite(pct) && pct < 30;
+  if(pType === 'UL'){
+    if(belowThreshold) return b1FieldConfig(true); // 距離不到5日均幅30%，回調點不參考，改用B1上漲欄位
+    return {
+      high: {show:true, label:'突破口高點分析', key:'highPlain'},
+      low: {show:true, label:'美盤回調低點分析', key:'lowPullback'},
+      rise: {show:true, key:'rise'},
+      fallStart: {show:false},
+      smallFall: {show:true, key:'smallFall'},
+      smallRise: {show:false}
+    };
+  }
+  if(pType === 'UH'){
+    if(belowThreshold) return b1FieldConfig(false); // 距離不到5日均幅30%，回調點不參考，改用B1下跌欄位
+    return {
+      high: {show:true, label:'美盤回調高點分析', key:'highPullback'},
+      low: {show:true, label:'突破口低點分析', key:'lowPlain'},
+      rise: {show:false},
+      fallStart: {show:true, key:'fallStart'},
+      smallFall: {show:false},
+      smallRise: {show:true, key:'smallRise'}
+    };
+  }
+  return b1FieldConfig(s.b1Direction !== '下跌');
+}
+
+// 判斷欄位目前的內容是不是「還沒被使用者改過的自動帶入文字」：
+// 空白，或內容剛好等於現在算得出來的其中一種自動範本，都視為可以刷新。
+function autoFillTextarea(textareaId, text, recognizedVariants){
+  if(!text) return;
+  const ta = $(textareaId);
+  const variants = recognizedVariants || [text];
+  if(ta.value === '' || variants.includes(ta.value)) ta.value = text;
+}
+
+function applyFieldRow(rowId, textareaId, fieldCfg, templates, variantKeys){
   const row = $(rowId);
   if(!fieldCfg || !fieldCfg.show){ row.style.display = 'none'; return; }
   row.style.display = '';
-  $(textareaId).placeholder = fieldCfg.text || '';
+  const text = fieldCfg.key ? templates[fieldCfg.key] : undefined;
+  const variants = (variantKeys || [fieldCfg.key]).map(k=>templates[k]).filter(Boolean);
+  autoFillTextarea(textareaId, text, variants);
 }
 
 function updateAnalysisFieldsVisibility(){
   const s = getStratFields();
   const cfg = getModuleFieldConfig(pullbackType, s);
+  const T = computeAnalysisTemplates();
   $('lbl-highAnalysis').textContent = cfg.high.label;
-  applyFieldRow('row-highAnalysis', 'strat-highAnalysis', cfg.high);
+  applyFieldRow('row-highAnalysis', 'strat-highAnalysis', cfg.high, T, ['highPlain','highPullback']);
   $('lbl-lowAnalysis').textContent = cfg.low.label;
-  applyFieldRow('row-lowAnalysis', 'strat-lowAnalysis', cfg.low);
-  applyFieldRow('row-riseAnalysis', 'strat-riseAnalysis', cfg.rise);
-  applyFieldRow('row-fallStartAnalysis', 'strat-fallStartAnalysis', cfg.fallStart);
-  applyFieldRow('row-fallAnalysis', 'strat-fallAnalysis', cfg.smallFall);
-  applyFieldRow('row-smallRiseAnalysis', 'strat-smallRiseAnalysis', cfg.smallRise);
+  applyFieldRow('row-lowAnalysis', 'strat-lowAnalysis', cfg.low, T, ['lowPlain','lowPullback']);
+  applyFieldRow('row-riseAnalysis', 'strat-riseAnalysis', cfg.rise, T);
+  applyFieldRow('row-fallStartAnalysis', 'strat-fallStartAnalysis', cfg.fallStart, T);
+  applyFieldRow('row-fallAnalysis', 'strat-fallAnalysis', cfg.smallFall, T);
+  applyFieldRow('row-smallRiseAnalysis', 'strat-smallRiseAnalysis', cfg.smallRise, T);
+  autoFillTextarea('strat-upReversal', T.upReversal);
+  autoFillTextarea('strat-downReversal', T.downReversal);
 }
 
 function applyDraft(date){
@@ -907,7 +1077,6 @@ function getStratFields(){
     return active ? active.dataset.v : '';
   };
   return {
-    d1: getPillVal('d1'), h4: getPillVal('h4'), h1: getPillVal('h1'),
     nearBreak: getPillVal('nearBreak'),
     specialType: getPillVal('specialType'), specialNote: $('strat-specialNote').value,
     specialSubType: getPillVal('specialSubType'), b1Direction: getPillVal('b1Direction'),
@@ -920,14 +1089,13 @@ function getStratFields(){
 }
 
 function buildStratSection(mode, s){
-  const lines = [];
-  const trendLine = `▫ 趨勢：D1(${s.d1||'—'}行情)/H4(${s.h4||'—'}行情)/H1(${s.h1||'—'}行情)`;
+  const headLines = [];
   const judgeLine = `▫ 關盤價接近突破口：${s.nearBreak||'—'}`;
   const specialLine = `▫ 特殊盤型：${s.specialType||'—'}${s.specialType==='有' && s.specialNote ? '（'+s.specialNote+'）' : ''}`;
 
-  lines.push(trendLine, judgeLine, specialLine);
-  if(s.module) lines.push(`▫ 策略模組：${s.module}`);
-  if(s.phrase) lines.push(`▫ 策略語句：${s.phrase}`);
+  headLines.push(judgeLine, specialLine);
+  if(s.module) headLines.push(`▫ 策略模組：${s.module}`);
+  if(s.phrase) headLines.push(`▫ 策略語句：${s.phrase}`);
 
   const cfg = getModuleFieldConfig(pullbackType, s);
   const detailPairs = [
@@ -940,12 +1108,15 @@ function buildStratSection(mode, s){
     ['上漲行情反轉', s.upReversal, true],
     ['下跌行情反轉', s.downReversal, true]
   ];
+  const detailLines = [];
   detailPairs.forEach(([label, val, show])=>{
-    if(show && val && val.trim()) lines.push(`▫ ${label}：${val.trim()}`);
+    if(show && val && val.trim()) detailLines.push(`▫ ${label}：${val.trim()}`);
   });
 
-  if(mode === 'compact') return lines.join('\n');
-  return `策略解析：\n` + lines.join('\n');
+  if(mode === 'compact') return [...headLines, ...detailLines].join('\n');
+
+  const body = [headLines.join('\n'), detailLines.join('\n\n')].filter(Boolean).join('\n\n');
+  return `策略解析：\n\n` + body;
 }
 
 function updateReport(){
@@ -975,7 +1146,7 @@ $('btn-save5').addEventListener('click', saveFiveDay);
 $('btn-calc').addEventListener('click', calculate);
 
 $('in-PC').addEventListener('input', saveDraftNow);
-$('in-pullback').addEventListener('input', saveDraftNow);
+$('in-pullback').addEventListener('input', ()=>{ updateAnalysisFieldsVisibility(); saveDraftNow(); });
 $('in-threshold').addEventListener('input', saveDraftNow);
 
 $('pullback-type').querySelectorAll('.pill').forEach(p=>{
@@ -1006,8 +1177,6 @@ document.querySelectorAll('#results .pill-row .pill').forEach(p=>{
     if(lastCalc) $('report').textContent = buildReport(reportMode, lastCalc);
   });
 });
-
-$('btn-download-history').addEventListener('click', downloadReportHistory);
 
 $('btn-copy').addEventListener('click', async ()=>{
   const text = $('report').textContent;
